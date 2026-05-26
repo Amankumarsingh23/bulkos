@@ -7,6 +7,7 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { PageTransition } from "@/components/ui/PageTransition";
 import { ToastProvider } from "@/components/ui/Toast";
+import { InstallPrompt } from "@/components/ui/InstallPrompt";
 import { cn } from "@/lib/utils";
 import type { User } from "@supabase/supabase-js";
 
@@ -49,6 +50,7 @@ export function PageWrapper({ user, children }: PageWrapperProps) {
           </main>
         </div>
       </div>
+      <InstallPrompt />
     </ToastProvider>
   );
 }
