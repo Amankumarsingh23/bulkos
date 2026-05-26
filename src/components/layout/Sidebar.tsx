@@ -26,6 +26,15 @@ const NAV_ITEMS = [
   { label: "Settings",    href: "/settings",   icon: Settings        },
 ] as const;
 
+// Bottom tab bar shows 5 primary items on mobile
+const TAB_ITEMS = [
+  { label: "Home",      href: "/dashboard",  icon: LayoutDashboard },
+  { label: "Log",       href: "/log",        icon: PlusCircle      },
+  { label: "Analytics", href: "/analytics",  icon: BarChart3       },
+  { label: "Goals",     href: "/goals",      icon: Target          },
+  { label: "Settings",  href: "/settings",   icon: Settings        },
+] as const;
+
 interface SidebarProps {
   user: User;
   isOpen: boolean;
@@ -63,8 +72,6 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
             Bulk<span className="text-gold">OS</span>
           </span>
         </Link>
-
-        {/* Close button — mobile only */}
         <button
           onClick={onClose}
           className="lg:hidden rounded-md p-1 text-warm-gray hover:text-charcoal hover:bg-sand/50 transition-colors"
@@ -77,7 +84,7 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
       {/* Nav */}
       <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-          const active = pathname === href;
+          const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
               key={href}
@@ -90,7 +97,6 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                   : "text-warm-gray hover:bg-ivory hover:text-charcoal font-normal"
               )}
             >
-              {/* Active gold left border */}
               {active && (
                 <motion.span
                   layoutId="active-pill"
@@ -114,7 +120,6 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
       {/* User + Logout */}
       <div className="mt-auto px-3 pb-5 pt-4 border-t border-sand/60">
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-ivory transition-colors duration-150 group">
-          {/* Avatar */}
           <div className="h-8 w-8 rounded-full bg-gold/20 border border-gold/30 flex items-center justify-center flex-shrink-0">
             <span className="font-display text-xs font-semibold text-gold-dark">{initials}</span>
           </div>
@@ -136,12 +141,12 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* ── Desktop sidebar (always visible) ──────────────────────────── */}
+      {/* ── Desktop sidebar ────────────────────────────────────────────── */}
       <aside className="hidden lg:flex flex-col w-[280px] flex-shrink-0 h-screen sticky top-0 bg-ivory border-r border-sand/70 shadow-warm">
         {sidebarContent}
       </aside>
 
-      {/* ── Mobile sidebar (slide-in overlay) ─────────────────────────── */}
+      {/* ── Tablet: slide-in drawer (md–lg) ───────────────────────────── */}
       <AnimatePresence>
         {isOpen && (
           <>
@@ -167,6 +172,50 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
           </>
         )}
       </AnimatePresence>
+
+      {/* ── Mobile: bottom tab bar ─────────────────────────────────────── */}
+      <nav
+        className={cn(
+          "fixed bottom-0 inset-x-0 z-40 lg:hidden",
+          "bg-ivory/95 backdrop-blur-md border-t border-sand/70",
+          "pb-[env(safe-area-inset-bottom,0px)]"
+        )}
+        aria-label="Main navigation"
+      >
+        <div className="flex items-stretch h-16">
+          {TAB_ITEMS.map(({ label, href, icon: Icon }) => {
+            const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+            return (
+              <Link
+                key={href}
+                href={href}
+                className="relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors"
+              >
+                {active && (
+                  <motion.div
+                    layoutId="tab-active"
+                    className="absolute top-0 inset-x-3 h-0.5 rounded-full bg-gold"
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                )}
+                <Icon
+                  className={cn(
+                    "h-5 w-5 transition-all duration-150",
+                    active ? "text-gold scale-110" : "text-warm-gray"
+                  )}
+                  strokeWidth={active ? 2.25 : 1.75}
+                />
+                <span className={cn(
+                  "text-[9px] font-medium tracking-tight transition-colors duration-150",
+                  active ? "text-espresso" : "text-warm-gray"
+                )}>
+                  {label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </>
   );
 }

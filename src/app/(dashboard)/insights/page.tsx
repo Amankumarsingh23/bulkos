@@ -15,6 +15,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/hooks/useAuth";
 import { createBrowserClient } from "@/lib/supabase";
 import type { AiReport, DailyLog } from "@/types/database";
@@ -246,6 +247,7 @@ const QUICK_QUESTIONS = [
 // ---------- MAIN PAGE ----------
 export default function InsightsPage() {
   const { profile } = useAuth();
+  const { success: toastSuccess, error: toastError } = useToast();
   const [tab, setTab] = useState<Tab>("weekly");
 
   // Report state
@@ -340,8 +342,11 @@ export default function InsightsPage() {
       if (tab === "weekly") setWeeklyReport(json.content);
       else setMonthlyReport(json.content);
       fetchHistory();
+      toastSuccess("Report generated!");
     } catch (err) {
-      setReportError(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setReportError(msg);
+      toastError(msg);
     } finally {
       setGenerating(false);
     }

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/hooks/useAuth";
 import { createBrowserClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -277,6 +278,7 @@ function DeleteAccountModal({ onConfirm, onClose, loading }: {
 export default function SettingsPage() {
   const router = useRouter();
   const { profile, user, signOut } = useAuth();
+  const { success: toastSuccess, error: toastError } = useToast();
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
   const [allLogs, setAllLogs] = useState<DailyLog[]>([]);
 
@@ -375,7 +377,13 @@ export default function SettingsPage() {
       activity_level: profileDraft.activity_level,
     }).eq("id", user.id);
     setProfileSaving(false);
-    setProfileToast(error ? { msg: error.message, type: "error" } : { msg: "Profile saved.", type: "success" });
+    if (error) {
+      toastError(error.message);
+      setProfileToast({ msg: error.message, type: "error" });
+    } else {
+      toastSuccess("Profile updated!");
+      setProfileToast({ msg: "Profile saved.", type: "success" });
+    }
     setTimeout(() => setProfileToast(null), 3500);
   }
 
@@ -404,7 +412,13 @@ export default function SettingsPage() {
       target_date:      goalDraft.target_date || null,
     }).eq("id", user.id);
     setGoalSaving(false);
-    setGoalToast(error ? { msg: error.message, type: "error" } : { msg: "Goal updated.", type: "success" });
+    if (error) {
+      toastError(error.message);
+      setGoalToast({ msg: error.message, type: "error" });
+    } else {
+      toastSuccess("Goal updated!");
+      setGoalToast({ msg: "Goal updated.", type: "success" });
+    }
     setTimeout(() => setGoalToast(null), 3500);
   }
 

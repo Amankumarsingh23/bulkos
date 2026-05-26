@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Flame, Beef, Wheat, Droplets, Target,
-  ArrowRight, TrendingUp, CalendarCheck, Zap,
+  ArrowRight, TrendingUp, CalendarCheck, Zap, BookOpen,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip as RechartTooltip,
@@ -484,6 +484,7 @@ const fadeUp = (delay = 0) => ({
 });
 
 export default function DashboardPage() {
+  const router = useRouter();
   const data = useDashboardData();
 
   if (data.loading) {
@@ -502,6 +503,91 @@ export default function DashboardPage() {
   }
 
   const { todayLog, targets, profile } = data;
+
+  // ── Empty state: no logs at all ─────────────────────────────────────────────
+  const hasNoData = data.startingWeight === null && data.streak === 0 && data.weeklyAvgCalories === 0;
+  if (hasNoData) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4"
+      >
+        {/* Illustration */}
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.5, ease: "easeOut" }}
+          className="relative mb-8"
+        >
+          <div className="h-24 w-24 rounded-3xl bg-gold/10 border-2 border-gold/20 flex items-center justify-center mx-auto">
+            <BookOpen className="h-10 w-10 text-gold/60" strokeWidth={1.25} />
+          </div>
+          {/* Floating dots */}
+          {[
+            { x: "-2.5rem", y: "-1rem", delay: 0.3 },
+            { x: "2rem",    y: "-1.5rem", delay: 0.45 },
+            { x: "2.5rem",  y: "1rem", delay: 0.6 },
+          ].map((dot, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: dot.delay, type: "spring", stiffness: 300 }}
+              className="absolute h-3 w-3 rounded-full bg-gold/30"
+              style={{ left: dot.x, top: dot.y }}
+            />
+          ))}
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.4 }}
+        >
+          <h2 className="font-display text-2xl sm:text-3xl font-semibold text-espresso mb-3">
+            Your journey begins with one log
+          </h2>
+          <p className="text-warm-gray text-sm sm:text-base max-w-sm mx-auto mb-8 leading-relaxed">
+            Track your weight, calories, and macros daily.
+            Charts, insights, and projections unlock as your data grows.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center gap-3 justify-center">
+            <Button variant="primary" size="lg" onClick={() => router.push("/log")}>
+              Log your first entry <ArrowRight className="h-4 w-4" />
+            </Button>
+            {!profile?.target_weight_kg && (
+              <Button variant="secondary" size="lg" onClick={() => router.push("/onboarding")}>
+                Set up my goal
+              </Button>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Mini feature hints */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-12 grid grid-cols-3 gap-4 max-w-xs text-center"
+        >
+          {[
+            { icon: TrendingUp, label: "Weight trend" },
+            { icon: Target,     label: "Goal tracking" },
+            { icon: Zap,        label: "AI insights" },
+          ].map(({ icon: Icon, label }) => (
+            <div key={label} className="flex flex-col items-center gap-1.5">
+              <div className="h-9 w-9 rounded-xl bg-cream border border-sand/60 flex items-center justify-center">
+                <Icon className="h-4 w-4 text-warm-gray" strokeWidth={1.5} />
+              </div>
+              <span className="text-xs text-warm-gray">{label}</span>
+            </div>
+          ))}
+        </motion.div>
+      </motion.div>
+    );
+  }
 
   return (
     <div className="space-y-6">

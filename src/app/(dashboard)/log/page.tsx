@@ -11,6 +11,7 @@ import { format, addDays, parseISO, isToday, isFuture } from "date-fns";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 import { useDailyLog, type LogFormData, type MacroTargets, EMPTY_FORM } from "@/hooks/useDailyLog";
 import { cn } from "@/lib/utils";
 
@@ -275,11 +276,12 @@ function Toast({ show }: { show: boolean }) {
 function LogPageInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
+  const { success: toastSuccess, error: toastError } = useToast();
   const today        = format(new Date(), "yyyy-MM-dd");
   const initialDate  = searchParams.get("date") ?? today;
 
-  const [date,      setDate]      = useState(initialDate);
-  const [form,      setForm]      = useState<LogFormData>(EMPTY_FORM);
+  const [date, setDate] = useState(initialDate);
+  const [form, setForm] = useState<LogFormData>(EMPTY_FORM);
   const [showToast, setShowToast] = useState(false);
 
   const { log, targets, lastWeight, loggedDates, loading, saving, saveError, save } =
@@ -305,11 +307,14 @@ function LogPageInner() {
   async function handleSave() {
     const ok = await save(form);
     if (ok) {
+      toastSuccess("Log saved!");
       setShowToast(true);
       setTimeout(() => {
         setShowToast(false);
         router.push("/dashboard");
       }, 1800);
+    } else {
+      toastError("Failed to save log. Please try again.");
     }
   }
 

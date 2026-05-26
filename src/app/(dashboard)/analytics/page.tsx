@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { BarChart3, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import {
   ChartCard,
   WeightTrendChart,
@@ -42,9 +45,84 @@ function SkeletonChart() {
   );
 }
 
+function AnalyticsEmptyState({ loggedDays }: { loggedDays: number }) {
+  const router = useRouter();
+  const needed = 7;
+  const pct = Math.min(100, Math.round((loggedDays / needed) * 100));
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="flex flex-col items-center justify-center py-20 text-center px-4"
+    >
+      <motion.div
+        initial={{ scale: 0.85, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.4 }}
+        className="h-20 w-20 rounded-2xl bg-gold/10 border-2 border-gold/20 flex items-center justify-center mx-auto mb-6"
+      >
+        <BarChart3 className="h-9 w-9 text-gold/50" strokeWidth={1.25} />
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+        <h2 className="font-display text-2xl font-semibold text-espresso mb-2">
+          Keep logging!
+        </h2>
+        <p className="text-warm-gray text-sm max-w-xs mx-auto mb-6 leading-relaxed">
+          Charts unlock after <strong className="text-espresso">7 days</strong> of data.
+          You&apos;re {loggedDays} day{loggedDays !== 1 ? "s" : ""} in — almost there.
+        </p>
+      </motion.div>
+
+      {/* Progress bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="w-full max-w-xs mb-6"
+      >
+        <div className="flex justify-between text-xs text-warm-gray mb-2">
+          <span>{loggedDays} / {needed} days</span>
+          <span>{pct}%</span>
+        </div>
+        <div className="h-2.5 bg-sand/50 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-gold rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${pct}%` }}
+            transition={{ delay: 0.4, duration: 0.8, ease: "easeOut" }}
+          />
+        </div>
+        {/* Day dots */}
+        <div className="flex justify-between mt-3">
+          {Array.from({ length: needed }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                i < loggedDays ? "bg-gold" : "bg-sand/60"
+              }`}
+            />
+          ))}
+        </div>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}>
+        <Button variant="primary" size="md" onClick={() => router.push("/log")}>
+          Log today <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export default function AnalyticsPage() {
   const [range, setRange] = useState<TimeRange>("30D");
   const data = useAnalyticsData(range);
+
+  // Count unique days with any weight data across ALL time (not just current range)
+  const totalWeightDays = data.rawLogs.filter((l) => l.weight_kg !== null).length;
 
   return (
     <div className="space-y-6">
@@ -85,8 +163,13 @@ export default function AnalyticsPage() {
         </div>
       </motion.div>
 
-      {/* Chart grid */}
-      {data.loading ? (
+      {/* Empty state — less than 7 logged weight days */}
+      {!data.loading && totalWeightDays < 7 && (
+        <AnalyticsEmptyState loggedDays={totalWeightDays} />
+      )}
+
+      {/* Chart grid — only when enough data */}
+      {!data.loading && totalWeightDays < 7 ? null : data.loading ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {Array.from({ length: 8 }).map((_, i) => (
             <SkeletonChart key={i} />
