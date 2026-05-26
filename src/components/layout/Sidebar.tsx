@@ -10,6 +10,7 @@ import {
   Brain,
   Target,
   Ruler,
+  Camera,
   Settings,
   LogOut,
   X,
@@ -19,13 +20,14 @@ import { cn } from "@/lib/utils";
 import type { User } from "@supabase/supabase-js";
 
 const NAV_ITEMS = [
-  { label: "Dashboard",    href: "/dashboard",     icon: LayoutDashboard },
-  { label: "Log Entry",    href: "/log",           icon: PlusCircle      },
-  { label: "Analytics",    href: "/analytics",     icon: BarChart3       },
-  { label: "Measurements", href: "/measurements",  icon: Ruler           },
-  { label: "AI Insights",  href: "/insights",      icon: Brain           },
-  { label: "Goals",        href: "/goals",         icon: Target          },
-  { label: "Settings",     href: "/settings",      icon: Settings        },
+  { label: "Dashboard",       href: "/dashboard",        icon: LayoutDashboard },
+  { label: "Log Entry",       href: "/log",              icon: PlusCircle      },
+  { label: "Analytics",       href: "/analytics",        icon: BarChart3       },
+  { label: "Measurements",    href: "/measurements",     icon: Ruler           },
+  { label: "Progress Photos", href: "/progress-photos",  icon: Camera          },
+  { label: "AI Insights",     href: "/insights",         icon: Brain           },
+  { label: "Goals",           href: "/goals",            icon: Target          },
+  { label: "Settings",        href: "/settings",         icon: Settings        },
 ] as const;
 
 // Bottom tab bar shows 5 primary items on mobile

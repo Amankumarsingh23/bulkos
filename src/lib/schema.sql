@@ -134,7 +134,31 @@ create index if not exists body_measurements_user_date_idx
   on public.body_measurements (user_id, measured_at desc);
 
 -- ────────────────────────────────────────────────────────────
--- 6. ROW LEVEL SECURITY
+-- 6. PROGRESS_PHOTOS
+-- ────────────────────────────────────────────────────────────
+-- Storage bucket: create manually in Supabase Dashboard →
+--   Storage → New bucket → Name: "progress-photos" → Public: ON
+-- Then add this storage policy (SQL Editor):
+--   create policy "users manage own photos" on storage.objects
+--     for all using (auth.uid()::text = (storage.foldername(name))[1])
+--     with check (auth.uid()::text = (storage.foldername(name))[1]);
+
+create table if not exists public.progress_photos (
+  id           uuid        primary key default gen_random_uuid(),
+  user_id      uuid        not null references public.profiles (id) on delete cascade,
+  taken_at     date        not null default current_date,
+  storage_path text        not null,
+  public_url   text        not null,
+  pose         text        check (pose in ('front','back','left','right','flexing','other')),
+  notes        text,
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists progress_photos_user_date_idx
+  on public.progress_photos (user_id, taken_at desc);
+
+-- ────────────────────────────────────────────────────────────
+-- 7. ROW LEVEL SECURITY
 -- ────────────────────────────────────────────────────────────
 
 -- profiles
@@ -205,6 +229,21 @@ drop policy if exists "milestones: delete own" on public.milestones;
 create policy "milestones: delete own"
   on public.milestones for delete
   using (auth.uid() = user_id);
+
+-- progress_photos
+alter table public.progress_photos enable row level security;
+
+drop policy if exists "progress_photos: select own" on public.progress_photos;
+create policy "progress_photos: select own"
+  on public.progress_photos for select using (auth.uid() = user_id);
+
+drop policy if exists "progress_photos: insert own" on public.progress_photos;
+create policy "progress_photos: insert own"
+  on public.progress_photos for insert with check (auth.uid() = user_id);
+
+drop policy if exists "progress_photos: delete own" on public.progress_photos;
+create policy "progress_photos: delete own"
+  on public.progress_photos for delete using (auth.uid() = user_id);
 
 -- body_measurements
 alter table public.body_measurements enable row level security;

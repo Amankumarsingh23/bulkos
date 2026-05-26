@@ -121,6 +121,34 @@ export interface Database {
         };
         Relationships: [];
       };
+      progress_photos: {
+        Row: {
+          id: string;
+          user_id: string;
+          taken_at: string;
+          storage_path: string;
+          public_url: string;
+          pose: "front" | "back" | "left" | "right" | "flexing" | "other" | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          taken_at?: string;
+          storage_path: string;
+          public_url: string;
+          pose?: "front" | "back" | "left" | "right" | "flexing" | "other" | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          taken_at?: string;
+          pose?: "front" | "back" | "left" | "right" | "flexing" | "other" | null;
+          notes?: string | null;
+        };
+        Relationships: [];
+      };
       body_measurements: {
         Row: {
           id: string;
@@ -222,3 +250,4 @@ export type DailyLog = Database["public"]["Tables"]["daily_logs"]["Row"];
 export type Milestone = Database["public"]["Tables"]["milestones"]["Row"];
 export type AiReport = Database["public"]["Tables"]["ai_reports"]["Row"];
 export type BodyMeasurement = Database["public"]["Tables"]["body_measurements"]["Row"];
+export type ProgressPhoto = Database["public"]["Tables"]["progress_photos"]["Row"];
