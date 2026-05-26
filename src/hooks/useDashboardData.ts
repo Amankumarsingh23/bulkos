@@ -50,6 +50,7 @@ export interface DashboardData {
   startingWeight: number | null;
   weightChange: number | null;
   last7Weights: number[];
+  allLogs: DailyLog[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -123,6 +124,7 @@ const EMPTY: DashboardData = {
   streak: 0, weekDays: [], weightChart: [],
   macroSlices: [], weeklyAvgCalories: 0,
   currentWeight: null, startingWeight: null, weightChange: null, last7Weights: [],
+  allLogs: [],
 };
 
 export function useDashboardData(): DashboardData {
@@ -212,6 +214,7 @@ export function useDashboardData(): DashboardData {
         loading: false, profile, targets, todayLog,
         streak, weekDays, weightChart, macroSlices, weeklyAvgCalories,
         currentWeight, startingWeight, weightChange, last7Weights,
+        allLogs: logs,
       });
     }
 

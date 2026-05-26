@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Flame, Beef, Wheat, Droplets, Target,
-  ArrowRight, TrendingUp, CalendarCheck, Zap, BookOpen,
+  ArrowRight, TrendingUp, CalendarCheck, Zap, BookOpen, X,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip as RechartTooltip,
@@ -17,6 +18,7 @@ import { SkeletonCard } from "@/components/ui/Skeleton";
 import { Badge } from "@/components/ui/Badge";
 import { ProgressRing } from "@/components/ui/ProgressRing";
 import { useDashboardData, type WeekDay, type WeightChartPoint } from "@/hooks/useDashboardData";
+import { computeAdaptiveTDEE } from "@/lib/adaptiveTDEE";
 import { cn } from "@/lib/utils";
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
@@ -476,6 +478,59 @@ function MacroDonut({ slices, avgCalories }: {
   );
 }
 
+// ─── Smart TDEE banner ────────────────────────────────────────────────────────
+
+function AdaptiveTDEEBanner({
+  difference,
+  recommendedCalories,
+  onDismiss,
+}: { difference: number; recommendedCalories: number; onDismiss: () => void }) {
+  const router = useRouter();
+  const isHigh = difference > 0;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+      transition={{ duration: 0.3 }}
+      className="flex items-center justify-between gap-3 bg-gold/8 border border-gold/30 rounded-2xl px-5 py-4"
+    >
+      <div className="flex items-start gap-3 min-w-0">
+        <div className="h-8 w-8 rounded-full bg-gold/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <TrendingUp className="h-4 w-4 text-gold-dark" strokeWidth={2} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-espresso">
+            Your calorie target may be off by ~{Math.abs(difference)} kcal
+          </p>
+          <p className="text-xs text-warm-gray mt-0.5 leading-relaxed">
+            {isHigh
+              ? "Your body burns more than the formula estimates — consider eating more."
+              : "You may be over-estimating your burn — your actual target is lower."}{" "}
+            Smart TDEE suggests{" "}
+            <span className="font-semibold text-espresso">{recommendedCalories.toLocaleString()} kcal/day</span>.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={() => router.push("/settings")}
+          className="text-xs font-semibold text-gold border border-gold/40 bg-gold/10 px-3 py-1.5 rounded-lg hover:bg-gold/20 transition-colors whitespace-nowrap"
+        >
+          View in Settings
+        </button>
+        <button
+          onClick={onDismiss}
+          className="p-1.5 rounded-lg text-warm-gray hover:bg-sand/40 transition-colors"
+          aria-label="Dismiss"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const fadeUp = (delay = 0) => ({
@@ -487,6 +542,38 @@ const fadeUp = (delay = 0) => ({
 export default function DashboardPage() {
   const router = useRouter();
   const data = useDashboardData();
+  const [tdeebannerDismissed, setTdeeBannerDismissed] = useState(false);
+
+  function dismissTDEEBanner() {
+    setTdeeBannerDismissed(true);
+    try { localStorage.setItem("bulkos-tdee-banner-dismissed", new Date().toISOString()); } catch {}
+  }
+
+  // Check if banner was already dismissed this session / recently
+  const bannerPrevDismissed = (() => {
+    try {
+      const ts = localStorage.getItem("bulkos-tdee-banner-dismissed");
+      if (!ts) return false;
+      const daysSince = (Date.now() - new Date(ts).getTime()) / 86_400_000;
+      return daysSince < 7;
+    } catch { return false; }
+  })();
+
+  // Compute adaptive TDEE signal from available data
+  const adaptiveSignal = (() => {
+    if (!data.profile || !data.allLogs.length) return null;
+    const { height_cm, age, gender, activity_level } = data.profile;
+    if (!height_cm || !age) return null;
+    const gOff = gender === "male" ? 5 : gender === "female" ? -161 : -78;
+    const w = data.currentWeight;
+    if (!w) return null;
+    const bmr  = 10 * w + 6.25 * height_cm - 5 * age + gOff;
+    const tdee = Math.round(bmr * ({ sedentary: 1.2, lightly_active: 1.375, moderately_active: 1.55, very_active: 1.725, extra_active: 1.9 }[activity_level ?? "moderately_active"] ?? 1.55));
+    const result = computeAdaptiveTDEE(data.allLogs, { height_cm, age, gender, activity_level }, tdee);
+    if (!result.hasEnoughData || (result.confidence !== "medium" && result.confidence !== "high")) return null;
+    if (Math.abs(result.difference) < 150) return null;
+    return result;
+  })();
 
   if (data.loading) {
     return (
@@ -595,6 +682,17 @@ export default function DashboardPage() {
 
       {/* ── Log Today CTA (if not logged) ── */}
       {!todayLog && <LogTodayCTA />}
+
+      {/* ── Adaptive TDEE insight banner ── */}
+      <AnimatePresence>
+        {adaptiveSignal && !tdeebannerDismissed && !bannerPrevDismissed && (
+          <AdaptiveTDEEBanner
+            difference={adaptiveSignal.difference}
+            recommendedCalories={adaptiveSignal.recommendedCalories}
+            onDismiss={dismissTDEEBanner}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Today at a Glance ── */}
       <motion.section {...fadeUp(0.05)}>

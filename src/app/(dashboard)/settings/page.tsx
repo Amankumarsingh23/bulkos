@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Target, Database, Ruler, Info,
   Check, X, Download, Trash2, AlertTriangle,
-  GitFork, ExternalLink, ChevronDown,
+  GitFork, ExternalLink, ChevronDown, TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -16,6 +16,7 @@ import { createBrowserClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import type { ActivityLevel, Gender, DailyLog } from "@/types/database";
 import { format, parseISO } from "date-fns";
+import { computeAdaptiveTDEE, type AdaptiveTDEEResult } from "@/lib/adaptiveTDEE";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,167 @@ function computeMacros(
   const fatG      = Math.round(weightKg * 0.8);
   const carbsG    = Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4));
   return { calories: Math.round(calories), proteinG, carbsG, fatG, tdee };
+}
+
+// ─── Adaptive TDEE card ───────────────────────────────────────────────────────
+
+const CONF_COLOR: Record<string, string> = {
+  insufficient: "#9B8E87",
+  low:          "#C9A96E",
+  medium:       "#8FAF8F",
+  high:         "#5B8A5B",
+};
+
+const CONF_LABEL: Record<string, string> = {
+  insufficient: "Not enough data",
+  low:          "Low confidence",
+  medium:       "Medium confidence",
+  high:         "High confidence",
+};
+
+function AdaptiveTDEECard({
+  result,
+  currentActivityLevel,
+  onApply,
+  applying,
+}: {
+  result: AdaptiveTDEEResult;
+  currentActivityLevel: string;
+  onApply: (level: ActivityLevel) => void;
+  applying: boolean;
+}) {
+  const isSameLevel  = result.suggestedActivityLevel === currentActivityLevel;
+  const absiff       = Math.abs(result.difference);
+  const isSignificant = absiff >= 100;
+
+  return (
+    <div className="bg-ivory rounded-2xl border border-sand/60 shadow-warm-md px-6 py-5">
+      <div className="flex items-center gap-2.5 mb-5 pb-4 border-b border-sand/40">
+        <div className="h-8 w-8 rounded-lg bg-gold/12 flex items-center justify-center text-gold flex-shrink-0">
+          <TrendingUp className="h-4 w-4" />
+        </div>
+        <div>
+          <h2 className="font-display text-base font-semibold text-espresso">Smart TDEE</h2>
+          <p className="text-xs text-warm-gray mt-0.5">Calibrated from your actual weight changes</p>
+        </div>
+        <span
+          className="ml-auto text-[11px] font-semibold px-2.5 py-1 rounded-full"
+          style={{
+            background: CONF_COLOR[result.confidence] + "20",
+            color:      CONF_COLOR[result.confidence],
+          }}
+        >
+          {CONF_LABEL[result.confidence]}
+        </span>
+      </div>
+
+      {!result.hasEnoughData ? (
+        <div className="flex items-start gap-3 text-sm text-warm-gray bg-cream rounded-xl border border-sand/50 px-4 py-3">
+          <Info className="h-4 w-4 text-gold flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-charcoal mb-0.5">Keep logging to unlock Smart TDEE</p>
+            <p className="text-xs leading-relaxed">
+              Log at least 14 days with calories + weight. You&apos;ve logged{" "}
+              <strong>{result.daysWithCals}</strong> day{result.daysWithCals !== 1 ? "s" : ""} with calories so far.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Two-col comparison */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-cream rounded-xl border border-sand/50 px-4 py-3 text-center">
+              <p className="text-[11px] font-semibold text-warm-gray uppercase tracking-wider mb-1">Formula TDEE</p>
+              <p className="font-display text-2xl font-semibold text-warm-gray">{result.formulaTDEE.toLocaleString()}</p>
+              <p className="text-xs text-warm-gray/60">kcal / day</p>
+            </div>
+            <div className="bg-gold/8 rounded-xl border border-gold/30 px-4 py-3 text-center">
+              <p className="text-[11px] font-semibold text-gold-dark uppercase tracking-wider mb-1">Your actual TDEE</p>
+              <p className="font-display text-2xl font-semibold text-espresso">{result.adaptiveTDEE.toLocaleString()}</p>
+              <p className="text-xs text-warm-gray/60">kcal / day</p>
+            </div>
+          </div>
+
+          {/* Difference callout */}
+          {isSignificant && (
+            <div className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${
+              result.difference < 0
+                ? "bg-terracotta/8 border-terracotta/25 text-terracotta"
+                : "bg-sage/10 border-sage/30 text-sage"
+            }`}>
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">
+                  Your formula TDEE is {absiff} kcal {result.difference < 0 ? "too high" : "too low"}
+                </p>
+                <p className="text-xs mt-0.5 opacity-80">
+                  {result.difference < 0
+                    ? "You're not gaining as fast as expected. The formula overestimates your burn."
+                    : "You're gaining faster than expected. Your metabolism burns more than the formula thinks."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-3 text-center text-xs">
+            <div>
+              <p className="font-display text-base font-semibold text-espresso">{result.avgDailyCals.toLocaleString()}</p>
+              <p className="text-warm-gray">Avg daily kcal</p>
+            </div>
+            <div>
+              <p className={`font-display text-base font-semibold ${result.weeklyWeightChange >= 0 ? "text-sage" : "text-terracotta"}`}>
+                {result.weeklyWeightChange >= 0 ? "+" : ""}{result.weeklyWeightChange} kg
+              </p>
+              <p className="text-warm-gray">Per week (avg)</p>
+            </div>
+            <div>
+              <p className="font-display text-base font-semibold text-espresso">{result.weeksOfData}w</p>
+              <p className="text-warm-gray">Data window</p>
+            </div>
+          </div>
+
+          {/* Recommendation */}
+          <div className="bg-espresso rounded-xl px-4 py-4 text-ivory">
+            <p className="text-[11px] font-semibold uppercase tracking-widest mb-1 text-ivory/60">Recommendation</p>
+            <p className="text-base font-semibold">
+              Eat <span className="text-gold">{result.recommendedCalories.toLocaleString()} kcal/day</span>
+            </p>
+            <p className="text-xs text-ivory/70 mt-0.5">
+              Your actual TDEE ({result.adaptiveTDEE.toLocaleString()}) + 300 kcal lean-bulk surplus
+            </p>
+          </div>
+
+          {/* Apply button */}
+          {result.suggestedActivityLevel && !isSameLevel && (
+            <div className="flex items-center justify-between gap-3 bg-cream rounded-xl border border-sand/60 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-charcoal">
+                  Set activity to <strong>{result.suggestedActivityLabel}</strong>
+                </p>
+                <p className="text-xs text-warm-gray mt-0.5">
+                  This recalibrates your formula TDEE to match your actual burn
+                </p>
+              </div>
+              <button
+                onClick={() => onApply(result.suggestedActivityLevel!)}
+                disabled={applying}
+                className="text-xs font-semibold text-gold border border-gold/40 bg-gold/8 px-3 py-1.5 rounded-lg hover:bg-gold/15 transition-colors disabled:opacity-50 flex-shrink-0"
+              >
+                {applying ? "Saving…" : "Apply"}
+              </button>
+            </div>
+          )}
+          {isSameLevel && (
+            <p className="text-xs text-sage flex items-center gap-1.5">
+              <Check className="h-3.5 w-3.5" />
+              Your current activity level already matches your actual burn — great calibration!
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── SettingsCard ─────────────────────────────────────────────────────────────
@@ -307,6 +469,7 @@ export default function SettingsPage() {
   const [deleteRangeToast, setDeleteRangeToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
+  const [adaptiveApplying, setAdaptiveApplying] = useState(false);
 
   // ── Units ──────────────────────────────────────────────────────────────────
   const [units, setUnits] = useState({ weight: "kg", height: "cm" });
@@ -400,6 +563,30 @@ export default function SettingsPage() {
     const newMacros = computeMacros(w, parseFloat(height_cm), parseInt(age), gender, activity_level, tw, profile.target_date);
     return oldMacros ? { oldMacros, newMacros } : null;
   })();
+
+  // Adaptive TDEE
+  const adaptiveTDEEResult = (() => {
+    const w = currentWeight;
+    const { height_cm, age, gender, activity_level } = profileDraft;
+    if (!w || !height_cm || !age) return null;
+    const gOff  = gender === "male" ? 5 : gender === "female" ? -161 : -78;
+    const bmr   = 10 * w + 6.25 * parseFloat(height_cm) - 5 * parseInt(age) + gOff;
+    const tdee  = Math.round(bmr * (ACT[activity_level] ?? 1.55));
+    return computeAdaptiveTDEE(allLogs, { height_cm: parseFloat(height_cm), age: parseInt(age), gender, activity_level }, tdee);
+  })();
+
+  async function applyAdaptiveActivityLevel(level: ActivityLevel) {
+    if (!user?.id) return;
+    setAdaptiveApplying(true);
+    const sb = createBrowserClient();
+    const { error } = await sb.from("profiles").update({ activity_level: level }).eq("id", user.id);
+    setAdaptiveApplying(false);
+    if (error) toastError(error.message);
+    else {
+      setProfileDraft((d) => ({ ...d, activity_level: level }));
+      toastSuccess("Activity level updated to match your actual burn!");
+    }
+  }
 
   // ── Goal save ──────────────────────────────────────────────────────────────
   async function saveGoal() {
@@ -628,7 +815,19 @@ export default function SettingsPage() {
           </SettingsCard>
         </motion.div>
 
-        {/* ── 3. Data Management ───────────────────────────────────────────── */}
+        {/* ── 3. Smart TDEE ────────────────────────────────────────────────── */}
+        {adaptiveTDEEResult && (
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.15 }}>
+            <AdaptiveTDEECard
+              result={adaptiveTDEEResult}
+              currentActivityLevel={profileDraft.activity_level}
+              onApply={applyAdaptiveActivityLevel}
+              applying={adaptiveApplying}
+            />
+          </motion.div>
+        )}
+
+        {/* ── 4. Data Management ───────────────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.15 }}>
           <SettingsCard icon={<Database className="h-4 w-4" />} title="Data" description={`${allLogs.length} log entries`}>
 
@@ -692,7 +891,7 @@ export default function SettingsPage() {
           </SettingsCard>
         </motion.div>
 
-        {/* ── 4. Units ─────────────────────────────────────────────────────── */}
+        {/* ── 5. Units ─────────────────────────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}>
           <SettingsCard icon={<Ruler className="h-4 w-4" />} title="Units" description="Stored in your browser — display-only for now">
             <div className="space-y-1 divide-y divide-sand/40">
