@@ -218,6 +218,62 @@ export interface Database {
         };
         Relationships: [];
       };
+      workout_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          workout_date: string;
+          name: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          workout_date?: string;
+          name?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          workout_date?: string;
+          name?: string | null;
+          notes?: string | null;
+        };
+        Relationships: [];
+      };
+      workout_sets: {
+        Row: {
+          id: string;
+          session_id: string;
+          user_id: string;
+          exercise: string;
+          set_number: number;
+          reps: number | null;
+          weight_kg: number | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          user_id: string;
+          exercise: string;
+          set_number?: number;
+          reps?: number | null;
+          weight_kg?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          exercise?: string;
+          set_number?: number;
+          reps?: number | null;
+          weight_kg?: number | null;
+          notes?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -251,3 +307,5 @@ export type Milestone = Database["public"]["Tables"]["milestones"]["Row"];
 export type AiReport = Database["public"]["Tables"]["ai_reports"]["Row"];
 export type BodyMeasurement = Database["public"]["Tables"]["body_measurements"]["Row"];
 export type ProgressPhoto = Database["public"]["Tables"]["progress_photos"]["Row"];
+export type WorkoutSession = Database["public"]["Tables"]["workout_sessions"]["Row"];
+export type WorkoutSet = Database["public"]["Tables"]["workout_sets"]["Row"];

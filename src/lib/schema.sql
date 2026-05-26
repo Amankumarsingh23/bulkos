@@ -158,7 +158,39 @@ create index if not exists progress_photos_user_date_idx
   on public.progress_photos (user_id, taken_at desc);
 
 -- ────────────────────────────────────────────────────────────
--- 7. ROW LEVEL SECURITY
+-- 7. WORKOUT_SESSIONS + WORKOUT_SETS
+-- ────────────────────────────────────────────────────────────
+create table if not exists public.workout_sessions (
+  id           uuid        primary key default gen_random_uuid(),
+  user_id      uuid        not null references public.profiles (id) on delete cascade,
+  workout_date date        not null default current_date,
+  name         text,
+  notes        text,
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists workout_sessions_user_date_idx
+  on public.workout_sessions (user_id, workout_date desc);
+
+create table if not exists public.workout_sets (
+  id           uuid        primary key default gen_random_uuid(),
+  session_id   uuid        not null references public.workout_sessions (id) on delete cascade,
+  user_id      uuid        not null references public.profiles (id) on delete cascade,
+  exercise     text        not null,
+  set_number   smallint    not null default 1,
+  reps         smallint,
+  weight_kg    numeric(6,2),
+  notes        text,
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists workout_sets_session_idx
+  on public.workout_sets (session_id);
+create index if not exists workout_sets_user_exercise_idx
+  on public.workout_sets (user_id, exercise, created_at desc);
+
+-- ────────────────────────────────────────────────────────────
+-- 8. ROW LEVEL SECURITY
 -- ────────────────────────────────────────────────────────────
 
 -- profiles
@@ -291,8 +323,46 @@ create policy "ai_reports: delete own"
   on public.ai_reports for delete
   using (auth.uid() = user_id);
 
+-- workout_sessions
+alter table public.workout_sessions enable row level security;
+
+drop policy if exists "workout_sessions: select own" on public.workout_sessions;
+create policy "workout_sessions: select own"
+  on public.workout_sessions for select using (auth.uid() = user_id);
+
+drop policy if exists "workout_sessions: insert own" on public.workout_sessions;
+create policy "workout_sessions: insert own"
+  on public.workout_sessions for insert with check (auth.uid() = user_id);
+
+drop policy if exists "workout_sessions: update own" on public.workout_sessions;
+create policy "workout_sessions: update own"
+  on public.workout_sessions for update using (auth.uid() = user_id);
+
+drop policy if exists "workout_sessions: delete own" on public.workout_sessions;
+create policy "workout_sessions: delete own"
+  on public.workout_sessions for delete using (auth.uid() = user_id);
+
+-- workout_sets
+alter table public.workout_sets enable row level security;
+
+drop policy if exists "workout_sets: select own" on public.workout_sets;
+create policy "workout_sets: select own"
+  on public.workout_sets for select using (auth.uid() = user_id);
+
+drop policy if exists "workout_sets: insert own" on public.workout_sets;
+create policy "workout_sets: insert own"
+  on public.workout_sets for insert with check (auth.uid() = user_id);
+
+drop policy if exists "workout_sets: update own" on public.workout_sets;
+create policy "workout_sets: update own"
+  on public.workout_sets for update using (auth.uid() = user_id);
+
+drop policy if exists "workout_sets: delete own" on public.workout_sets;
+create policy "workout_sets: delete own"
+  on public.workout_sets for delete using (auth.uid() = user_id);
+
 -- ────────────────────────────────────────────────────────────
--- 6. HELPER FUNCTIONS
+-- 9. HELPER FUNCTIONS
 -- ────────────────────────────────────────────────────────────
 
 -- get_weight_trend: daily weight + 7-day moving average
