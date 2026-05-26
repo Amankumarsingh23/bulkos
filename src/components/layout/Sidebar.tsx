@@ -12,6 +12,7 @@ import {
   Ruler,
   Camera,
   Dumbbell,
+  FileText,
   Settings,
   LogOut,
   X,
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { label: "Workout Log",     href: "/workout",          icon: Dumbbell        },
   { label: "AI Insights",     href: "/insights",         icon: Brain           },
   { label: "Goals",           href: "/goals",            icon: Target          },
+  { label: "PDF Report",      href: "/report",           icon: FileText        },
   { label: "Settings",        href: "/settings",         icon: Settings        },
 ] as const;
 
