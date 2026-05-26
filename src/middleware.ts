@@ -42,7 +42,7 @@ export async function middleware(req: NextRequest) {
 
   // Logged-in user hitting /login or /signup → send to app
   if (isAuthRoute && session) {
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
   // Unauthenticated user hitting a protected route → send to login

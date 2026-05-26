@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, ChevronRight, CalendarDays,
@@ -272,11 +272,13 @@ function Toast({ show }: { show: boolean }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function LogPage() {
-  const router  = useRouter();
-  const today   = format(new Date(), "yyyy-MM-dd");
+function LogPageInner() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const today        = format(new Date(), "yyyy-MM-dd");
+  const initialDate  = searchParams.get("date") ?? today;
 
-  const [date,      setDate]      = useState(today);
+  const [date,      setDate]      = useState(initialDate);
   const [form,      setForm]      = useState<LogFormData>(EMPTY_FORM);
   const [showToast, setShowToast] = useState(false);
 
@@ -306,7 +308,7 @@ export default function LogPage() {
       setShowToast(true);
       setTimeout(() => {
         setShowToast(false);
-        router.push("/");
+        router.push("/dashboard");
       }, 1800);
     }
   }
@@ -456,5 +458,13 @@ export default function LogPage() {
 
       <Toast show={showToast} />
     </>
+  );
+}
+
+export default function LogPage() {
+  return (
+    <Suspense>
+      <LogPageInner />
+    </Suspense>
   );
 }

@@ -596,7 +596,7 @@ export default function OnboardingPage() {
       }
       if (milestones.length > 0) await supabase.from("milestones").insert(milestones);
 
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setSubmitting(false);

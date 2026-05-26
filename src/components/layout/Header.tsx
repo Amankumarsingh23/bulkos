@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { QuickLogModal } from "@/components/log/QuickLogModal";
 
 const TITLE_MAP: Record<string, string> = {
-  "/":            "Dashboard",
+  "/dashboard":   "Dashboard",
   "/log":         "Log Entry",
   "/analytics":   "Analytics",
   "/insights":    "AI Insights",
