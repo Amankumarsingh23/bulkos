@@ -19,6 +19,11 @@ import { Badge } from "@/components/ui/Badge";
 import { ProgressRing } from "@/components/ui/ProgressRing";
 import { useDashboardData, type WeekDay, type WeightChartPoint } from "@/hooks/useDashboardData";
 import { computeAdaptiveTDEE } from "@/lib/adaptiveTDEE";
+import {
+  computeWeekScore, computeWeeklyHistory,
+  GRADE_COLOR, GRADE_BG,
+  type WeekScore,
+} from "@/lib/weeklyScore";
 import { cn } from "@/lib/utils";
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
@@ -478,6 +483,164 @@ function MacroDonut({ slices, avgCalories }: {
   );
 }
 
+// ─── Weekly Score card ────────────────────────────────────────────────────────
+
+function ScoreBar({ label, earned, max, detail, color }: {
+  label: string; earned: number; max: number; detail: string; color: string;
+}) {
+  const pct = max > 0 ? Math.round((earned / max) * 100) : 0;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-warm-gray font-medium">{label}</span>
+        <span className="text-warm-gray/70">{detail}</span>
+      </div>
+      <div className="h-2 bg-sand/40 rounded-full overflow-hidden">
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: color }}
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.7, ease: "easeOut", delay: 0.15 }}
+        />
+      </div>
+      <div className="flex justify-between text-[10px] text-warm-gray/50">
+        <span>{earned} pts</span>
+        <span>{max} max</span>
+      </div>
+    </div>
+  );
+}
+
+function HistoryBars({ history }: { history: WeekScore[] }) {
+  const maxScore = Math.max(...history.map((w) => w.score), 1);
+  return (
+    <div className="flex items-end gap-1 h-10">
+      {history.map((w, i) => {
+        const h = Math.max(4, Math.round((w.score / maxScore) * 40));
+        const isLast = i === history.length - 1;
+        return (
+          <div key={w.weekStart} className="flex-1 flex flex-col items-center gap-0.5 group relative">
+            <div
+              className="w-full rounded-sm transition-opacity"
+              style={{
+                height: h,
+                background: GRADE_COLOR[w.grade],
+                opacity: w.hasData ? (isLast ? 1 : 0.55) : 0.15,
+              }}
+            />
+            {/* Tooltip on hover */}
+            <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-espresso text-ivory text-[10px] px-2 py-1 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              {w.weekLabel}: {w.hasData ? `${w.score} (${w.grade})` : "no data"}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function WeeklyScoreCard({ currentScore, history }: { currentScore: WeekScore; history: WeekScore[] }) {
+  const { grade, score, breakdown, insight, hasData } = currentScore;
+  const color = GRADE_COLOR[grade];
+  const bg    = GRADE_BG[grade];
+
+  return (
+    <div className="bg-ivory rounded-2xl border border-sand/60 shadow-warm-md overflow-hidden">
+      <div className="p-5">
+        <p className="text-[11px] font-semibold text-warm-gray uppercase tracking-widest mb-4">
+          Weekly Score
+        </p>
+
+        <div className="flex gap-5">
+          {/* Grade badge */}
+          <div
+            className="flex-shrink-0 h-20 w-20 rounded-2xl flex flex-col items-center justify-center border-2"
+            style={{ background: bg, borderColor: color + "55" }}
+          >
+            <span className="font-display text-4xl font-bold leading-none" style={{ color }}>
+              {grade}
+            </span>
+            {hasData && (
+              <span className="text-[11px] font-medium mt-0.5" style={{ color }}>
+                {score}/100
+              </span>
+            )}
+          </div>
+
+          {/* Breakdown bars */}
+          <div className="flex-1 space-y-2.5">
+            {hasData ? (
+              <>
+                <ScoreBar
+                  label="Consistency"
+                  earned={breakdown.consistency.earned}
+                  max={breakdown.consistency.max}
+                  detail={`${breakdown.consistency.daysLogged}/7 days`}
+                  color={color}
+                />
+                <ScoreBar
+                  label="Calories"
+                  earned={breakdown.calories.earned}
+                  max={breakdown.calories.max}
+                  detail={
+                    breakdown.calories.daysTracked > 0
+                      ? `${breakdown.calories.daysHit}/${breakdown.calories.daysTracked} days on target`
+                      : "not tracked"
+                  }
+                  color={color}
+                />
+                <ScoreBar
+                  label="Protein"
+                  earned={breakdown.protein.earned}
+                  max={breakdown.protein.max}
+                  detail={
+                    breakdown.protein.daysTracked > 0
+                      ? `${breakdown.protein.daysHit}/${breakdown.protein.daysTracked} days on target`
+                      : "not tracked"
+                  }
+                  color={color}
+                />
+              </>
+            ) : (
+              <p className="text-sm text-warm-gray/70 pt-4">
+                Start logging this week to earn your first score.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Insight */}
+        {hasData && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-xs text-warm-gray bg-cream rounded-xl border border-sand/40 px-3.5 py-2.5 mt-4 leading-relaxed"
+          >
+            {insight}
+          </motion.p>
+        )}
+      </div>
+
+      {/* History bar chart */}
+      <div className="px-5 pb-4 border-t border-sand/40 pt-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px] font-semibold text-warm-gray uppercase tracking-widest">
+            Last 8 weeks
+          </span>
+          <div className="flex items-center gap-2">
+            {(["A","B","C","D","F"] as const).map((g) => (
+              <span key={g} className="text-[10px] font-bold" style={{ color: GRADE_COLOR[g] }}>{g}</span>
+            ))}
+          </div>
+        </div>
+        <HistoryBars history={history} />
+      </div>
+    </div>
+  );
+}
+
 // ─── Smart TDEE banner ────────────────────────────────────────────────────────
 
 function AdaptiveTDEEBanner({
@@ -591,6 +754,15 @@ export default function DashboardPage() {
   }
 
   const { todayLog, targets, profile } = data;
+
+  // Weekly score
+  const scoreTargets = targets ? { calories: targets.calories, proteinG: targets.proteinG } : null;
+  const currentWeekLogs = data.weekDays
+    .filter((d) => !d.isFuture)
+    .map((d) => data.allLogs.find((l) => l.log_date === d.date))
+    .filter((l): l is NonNullable<typeof l> => l !== undefined);
+  const currentScore  = computeWeekScore(currentWeekLogs, scoreTargets);
+  const scoreHistory  = computeWeeklyHistory(data.allLogs, scoreTargets, 8);
 
   // ── Empty state: no logs at all ─────────────────────────────────────────────
   const hasNoData = data.startingWeight === null && data.streak === 0 && data.weeklyAvgCalories === 0;
@@ -721,6 +893,11 @@ export default function DashboardPage() {
       {/* ── This Week ── */}
       <motion.section {...fadeUp(0.12)}>
         <WeekView weekDays={data.weekDays} target={targets?.calories} />
+      </motion.section>
+
+      {/* ── Weekly Score ── */}
+      <motion.section {...fadeUp(0.17)}>
+        <WeeklyScoreCard currentScore={currentScore} history={scoreHistory} />
       </motion.section>
 
       {/* ── Charts ── */}
