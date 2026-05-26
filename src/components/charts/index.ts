@@ -1,2 +1,9 @@
-// Chart components barrel export
-// Add exports here as chart components are created
+export { ChartCard } from "./ChartCard";
+export { WeightTrendChart } from "./WeightTrendChart";
+export { CalorieSurplusChart } from "./CalorieSurplusChart";
+export { MacroStackedAreaChart } from "./MacroStackedAreaChart";
+export { ProteinPerKgChart } from "./ProteinPerKgChart";
+export { WeightVelocityChart } from "./WeightVelocityChart";
+export { BMIProgressChart } from "./BMIProgressChart";
+export { ConsistencyHeatmap } from "./ConsistencyHeatmap";
+export { CorrelationScatter } from "./CorrelationScatter";

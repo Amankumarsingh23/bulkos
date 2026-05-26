@@ -3,3 +3,5 @@ export { useDailyLog } from "./useDailyLog";
 export type { MacroTargets, LogFormData } from "./useDailyLog";
 export { useDashboardData } from "./useDashboardData";
 export type { DashboardData, WeekDay, WeightChartPoint, MacroSlice } from "./useDashboardData";
+export { useAnalyticsData } from "./useAnalyticsData";
+export type { AnalyticsData, WeightChartDatum, MacroStackDatum } from "./useAnalyticsData";
