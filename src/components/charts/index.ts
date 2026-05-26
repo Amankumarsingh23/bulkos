@@ -7,3 +7,4 @@ export { WeightVelocityChart } from "./WeightVelocityChart";
 export { BMIProgressChart } from "./BMIProgressChart";
 export { ConsistencyHeatmap } from "./ConsistencyHeatmap";
 export { CorrelationScatter } from "./CorrelationScatter";
+export { BodyCompositionChart } from "./BodyCompositionChart";

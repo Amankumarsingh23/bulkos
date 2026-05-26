@@ -10,6 +10,7 @@ import {
   calculateSurplus,
   calculateProteinPerKg,
   calculateBMI,
+  calculateBodyComposition,
   calculateCorrelation,
   buildConsistencyGrid,
   type TimeRange,
@@ -17,6 +18,7 @@ import {
   type WeeklySurplusPoint,
   type ProteinPerKgPoint,
   type BMIPoint,
+  type BodyCompPoint,
   type CorrelationPoint,
   type ConsistencyCell,
 } from "@/lib/analytics";
@@ -69,12 +71,14 @@ export interface AnalyticsData {
   targetCalories: number;
   goalWeight: number | null;
   heightCm: number | null;
+  gender: string | null;
   weightChart: WeightChartDatum[];
   surplusChart: WeeklySurplusPoint[];
   macroStack: MacroStackDatum[];
   proteinKgChart: ProteinPerKgPoint[];
   velocityChart: WeightVelocityPoint[];
   bmiChart: BMIPoint[];
+  bodyCompChart: BodyCompPoint[];
   consistencyGrid: ConsistencyCell[];
   correlationPoints: CorrelationPoint[];
   rawLogs: DailyLog[];
@@ -108,12 +112,14 @@ export function useAnalyticsData(range: TimeRange): AnalyticsData {
       targetCalories: 2500,
       goalWeight: null,
       heightCm: null,
+      gender: null,
       weightChart: [],
       surplusChart: [],
       macroStack: [],
       proteinKgChart: [],
       velocityChart: [],
       bmiChart: [],
+      bodyCompChart: [],
       consistencyGrid: [],
       correlationPoints: [],
       rawLogs: [],
@@ -161,6 +167,7 @@ export function useAnalyticsData(range: TimeRange): AnalyticsData {
   const proteinKgChart = calculateProteinPerKg(logs);
   const velocityChart = calculateWeightVelocity(logs);
   const bmiChart = heightCm ? calculateBMI(logs, heightCm) : [];
+  const bodyCompChart = heightCm ? calculateBodyComposition(logs, heightCm, profile.age, profile.gender) : [];
   const consistencyGrid = buildConsistencyGrid(allLogs, 12);
   const correlationPoints = calculateCorrelation(logs, targetCalories);
 
@@ -169,12 +176,14 @@ export function useAnalyticsData(range: TimeRange): AnalyticsData {
     targetCalories,
     goalWeight,
     heightCm,
+    gender: profile.gender ?? null,
     weightChart,
     surplusChart,
     macroStack,
     proteinKgChart,
     velocityChart,
     bmiChart,
+    bodyCompChart,
     consistencyGrid,
     correlationPoints,
     rawLogs: logs,

@@ -13,6 +13,7 @@ import {
   ProteinPerKgChart,
   WeightVelocityChart,
   BMIProgressChart,
+  BodyCompositionChart,
   ConsistencyHeatmap,
   CorrelationScatter,
 } from "@/components/charts";
@@ -247,6 +248,19 @@ export default function AnalyticsPage() {
                 tooltip="Background bands show WHO BMI categories. BMI is a rough population metric — use it as one signal, not a target."
               >
                 <BMIProgressChart data={data.bmiChart} />
+              </ChartCard>
+            </motion.div>
+          )}
+
+          {/* Body Composition — FFMI, lean mass, body fat % */}
+          {data.heightCm && (
+            <motion.div custom={5.5} initial="hidden" animate="show" variants={fadeUp}>
+              <ChartCard
+                title="Body Composition"
+                subtitle="Lean mass · Body fat % · FFMI score"
+                tooltip="FFMI (Fat-Free Mass Index) is a better measure for lifters than BMI — it tracks how muscular you are relative to your height. Lean mass rising over time means your bulk is working."
+              >
+                <BodyCompositionChart data={data.bodyCompChart} gender={data.gender} />
               </ChartCard>
             </motion.div>
           )}

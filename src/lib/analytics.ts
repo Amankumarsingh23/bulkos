@@ -206,6 +206,69 @@ export function buildConsistencyGrid(logs: DailyLog[], weeks = 12): ConsistencyC
   return cells;
 }
 
+// ── Body Composition ──────────────────────────────────────────────────────────
+
+export interface BodyCompPoint {
+  date: string;
+  bodyFatPct: number | null;
+  leanMassKg: number | null;
+  ffmi: number | null;
+}
+
+export interface FFMIBand {
+  label: string;
+  min: number;
+  max: number;
+  color: string;
+  description: string;
+}
+
+export function getFFMIBands(gender: string | null): FFMIBand[] {
+  const isFemale = gender === "female";
+  if (isFemale) {
+    return [
+      { label: "Beginner", min: 0, max: 15, color: "#9B8E87", description: "Just starting out" },
+      { label: "Average", min: 15, max: 17, color: "#C9A96E", description: "General fitness level" },
+      { label: "Above avg", min: 17, max: 19, color: "#8FAF8F", description: "Consistent training" },
+      { label: "Excellent", min: 19, max: 21, color: "#5B8A5B", description: "Dedicated athlete" },
+      { label: "Elite", min: 21, max: 26, color: "#2C6E2C", description: "Elite / competitive" },
+    ];
+  }
+  return [
+    { label: "Beginner", min: 0, max: 18, color: "#9B8E87", description: "Just starting out" },
+    { label: "Average", min: 18, max: 20, color: "#C9A96E", description: "General fitness level" },
+    { label: "Above avg", min: 20, max: 22, color: "#8FAF8F", description: "Consistent training" },
+    { label: "Excellent", min: 22, max: 24, color: "#5B8A5B", description: "Dedicated athlete" },
+    { label: "Elite", min: 24, max: 30, color: "#2C6E2C", description: "Elite / competitive" },
+  ];
+}
+
+// Deurenberg formula — estimates BF% from BMI, age, gender (no tape needed)
+function estimateBodyFat(bmi: number, age: number, gender: string | null): number {
+  const sex = gender === "male" ? 1 : gender === "female" ? 0 : 0.5;
+  return Math.max(3, Math.min(60, 1.2 * bmi + 0.23 * age - 10.8 * sex - 5.4));
+}
+
+export function calculateBodyComposition(
+  logs: DailyLog[],
+  heightCm: number,
+  age: number | null,
+  gender: string | null
+): BodyCompPoint[] {
+  if (!age || age <= 0) return [];
+  const hM = heightCm / 100;
+  return logs.map((l) => {
+    if (l.weight_kg === null) return { date: l.log_date, bodyFatPct: null, leanMassKg: null, ffmi: null };
+    const bmi = l.weight_kg / (hM * hM);
+    const bfPct = Math.round(estimateBodyFat(bmi, age, gender) * 10) / 10;
+    const leanKg = Math.round(l.weight_kg * (1 - bfPct / 100) * 10) / 10;
+    const ffmiRaw = leanKg / (hM * hM);
+    // Normalize to 1.8 m reference height (Kouri 1995)
+    const ffmi = Math.round((ffmiRaw + 6.3 * (1.8 - hM)) * 10) / 10;
+    return { date: l.log_date, bodyFatPct: bfPct, leanMassKg: leanKg, ffmi };
+  });
+}
+
 export function linearRegression(
   points: { x: number; y: number }[]
 ): { slope: number; intercept: number } | null {
