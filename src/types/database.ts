@@ -121,6 +121,51 @@ export interface Database {
         };
         Relationships: [];
       };
+      body_measurements: {
+        Row: {
+          id: string;
+          user_id: string;
+          measured_at: string;
+          neck_cm: number | null;
+          chest_cm: number | null;
+          waist_cm: number | null;
+          hips_cm: number | null;
+          left_arm_cm: number | null;
+          right_arm_cm: number | null;
+          left_thigh_cm: number | null;
+          right_thigh_cm: number | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          measured_at?: string;
+          neck_cm?: number | null;
+          chest_cm?: number | null;
+          waist_cm?: number | null;
+          hips_cm?: number | null;
+          left_arm_cm?: number | null;
+          right_arm_cm?: number | null;
+          left_thigh_cm?: number | null;
+          right_thigh_cm?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          measured_at?: string;
+          neck_cm?: number | null;
+          chest_cm?: number | null;
+          waist_cm?: number | null;
+          hips_cm?: number | null;
+          left_arm_cm?: number | null;
+          right_arm_cm?: number | null;
+          left_thigh_cm?: number | null;
+          right_thigh_cm?: number | null;
+          notes?: string | null;
+        };
+        Relationships: [];
+      };
       ai_reports: {
         Row: {
           id: string;
@@ -176,3 +221,4 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type DailyLog = Database["public"]["Tables"]["daily_logs"]["Row"];
 export type Milestone = Database["public"]["Tables"]["milestones"]["Row"];
 export type AiReport = Database["public"]["Tables"]["ai_reports"]["Row"];
+export type BodyMeasurement = Database["public"]["Tables"]["body_measurements"]["Row"];

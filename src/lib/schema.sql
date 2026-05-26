@@ -111,7 +111,30 @@ create table if not exists public.ai_reports (
 create index if not exists ai_reports_user_created_idx on public.ai_reports (user_id, created_at desc);
 
 -- ────────────────────────────────────────────────────────────
--- 5. ROW LEVEL SECURITY
+-- 5. BODY_MEASUREMENTS
+-- ────────────────────────────────────────────────────────────
+create table if not exists public.body_measurements (
+  id           uuid        primary key default gen_random_uuid(),
+  user_id      uuid        not null references public.profiles (id) on delete cascade,
+  measured_at  date        not null default current_date,
+  neck_cm      numeric(5,1),
+  chest_cm     numeric(5,1),
+  waist_cm     numeric(5,1),
+  hips_cm      numeric(5,1),
+  left_arm_cm  numeric(5,1),
+  right_arm_cm numeric(5,1),
+  left_thigh_cm  numeric(5,1),
+  right_thigh_cm numeric(5,1),
+  notes        text,
+  created_at   timestamptz not null default now(),
+  constraint body_measurements_user_date_unique unique (user_id, measured_at)
+);
+
+create index if not exists body_measurements_user_date_idx
+  on public.body_measurements (user_id, measured_at desc);
+
+-- ────────────────────────────────────────────────────────────
+-- 6. ROW LEVEL SECURITY
 -- ────────────────────────────────────────────────────────────
 
 -- profiles
@@ -181,6 +204,29 @@ create policy "milestones: update own"
 drop policy if exists "milestones: delete own" on public.milestones;
 create policy "milestones: delete own"
   on public.milestones for delete
+  using (auth.uid() = user_id);
+
+-- body_measurements
+alter table public.body_measurements enable row level security;
+
+drop policy if exists "body_measurements: select own" on public.body_measurements;
+create policy "body_measurements: select own"
+  on public.body_measurements for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "body_measurements: insert own" on public.body_measurements;
+create policy "body_measurements: insert own"
+  on public.body_measurements for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "body_measurements: update own" on public.body_measurements;
+create policy "body_measurements: update own"
+  on public.body_measurements for update
+  using (auth.uid() = user_id);
+
+drop policy if exists "body_measurements: delete own" on public.body_measurements;
+create policy "body_measurements: delete own"
+  on public.body_measurements for delete
   using (auth.uid() = user_id);
 
 -- ai_reports
