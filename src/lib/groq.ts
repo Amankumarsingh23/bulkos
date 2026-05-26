@@ -1,9 +1,11 @@
 import Groq from "groq-sdk";
 import type { Profile, DailyLog } from "@/types/database";
 
-export const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+// Lazy initialization — avoids module-evaluation error during `next build`
+// when GROQ_API_KEY isn't set (e.g. local dev without the key).
+function getGroqClient() {
+  return new Groq({ apiKey: process.env.GROQ_API_KEY });
+}
 
 const SYSTEM_PROMPT = `You are BulkOS AI — a nutrition and bulking coach analyzing a user's tracking data.
 You speak in a warm, encouraging but data-driven tone. You're like a smart friend
@@ -116,7 +118,7 @@ ${dayAvgs.map((d) => `  ${d.day}: ${d.avg}g`).join("\n") || "  Insufficient data
 export async function generateInsightReport(input: InsightInput): Promise<string> {
   const userMessage = buildDataSummary(input);
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroqClient().chat.completions.create({
     model: "llama-3.3-70b-versatile",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
@@ -140,7 +142,7 @@ export async function askAI(input: AskInput): Promise<string> {
     targetProtein,
   });
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroqClient().chat.completions.create({
     model: "llama-3.3-70b-versatile",
     messages: [
       { role: "system", content: ASK_SYSTEM_PROMPT },

@@ -1,24 +1,48 @@
 import { createClient } from "@supabase/supabase-js";
-import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
+import {
+  createBrowserClient as _createBrowserClient,
+  createServerClient as _createServerClient,
+} from "@supabase/auth-helpers-nextjs";
 import type { Database } from "@/types/database";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 // ── Browser client (Client Components) ───────────────────────────────────────
-// Use this in "use client" components via the useSupabase hook or directly.
 export function createBrowserClient() {
-  return createPagesBrowserClient<Database>();
+  return _createBrowserClient<Database>(url, anonKey);
 }
 
-// Singleton for use outside React (e.g. lib helpers called from the browser)
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// ── Admin client (service role — server only) ─────────────────────────────────
+// Lazy to avoid module-evaluation errors during `next build` when env vars aren't set.
+export function createAdminClient() {
+  return createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
-// ── Server client (Server Components / Route Handlers) ───────────────────────
-// Must be called inside a Server Component or Route Handler where cookies() works.
-export function createServerClient() {
-  const cookieStore = cookies();
-  return createServerComponentClient<Database>({ cookies: () => cookieStore });
+// ── Helper: build server client from a resolved cookie store ─────────────────
+// Pass the Awaited<ReturnType<typeof cookies()>> from Next.js here.
+export function buildServerClient(cookieStore: {
+  getAll(): { name: string; value: string }[];
+  set(name: string, value: string, options?: Record<string, unknown>): void;
+}) {
+  return _createServerClient<Database>(url, anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options as Record<string, unknown>)
+          );
+        } catch {
+          // In Server Components, cookies are read-only — ignore set errors.
+        }
+      },
+    },
+  });
 }

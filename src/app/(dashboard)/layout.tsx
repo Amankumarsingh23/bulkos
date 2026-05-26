@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
+import { buildServerClient } from "@/lib/supabase";
 import { PageWrapper } from "@/components/layout/PageWrapper";
-import type { Database } from "@/types/database";
 
 export default async function DashboardLayout({
   children,
@@ -10,9 +9,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const cookieStore = await cookies();
-  const supabase = createServerComponentClient<Database>({
-    cookies: () => cookieStore,
-  });
+  const supabase = buildServerClient(cookieStore);
 
   const {
     data: { user },

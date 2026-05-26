@@ -201,7 +201,7 @@ function TDEEModal({ oldMacros, newMacros, onConfirm, onClose }: {
             <X className="h-4 w-4" />
           </button>
         </div>
-        <p className="text-xs text-warm-gray mb-4">Based on your updated profile, here's how your daily targets change:</p>
+        <p className="text-xs text-warm-gray mb-4">Based on your updated profile, here&apos;s how your daily targets change:</p>
         <div className="bg-cream rounded-xl border border-sand/60 px-4 py-1 mb-5">
           <Row label="TDEE"          oldVal={oldMacros.tdee}     newVal={newMacros.tdee}     unit=" kcal" />
           <Row label="Target calories" oldVal={oldMacros.calories} newVal={newMacros.calories} unit=" kcal" />

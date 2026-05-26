@@ -50,6 +50,7 @@ export interface Database {
           target_date?: string | null;
           updated_at?: string;
         };
+        Relationships: [];
       };
       daily_logs: {
         Row: {
@@ -91,6 +92,7 @@ export interface Database {
           sleep_hours?: number | null;
           notes?: string | null;
         };
+        Relationships: [];
       };
       milestones: {
         Row: {
@@ -117,6 +119,7 @@ export interface Database {
           achieved?: boolean;
           achieved_at?: string | null;
         };
+        Relationships: [];
       };
       ai_reports: {
         Row: {
@@ -140,8 +143,10 @@ export interface Database {
           content?: string;
           data_snapshot?: Json | null;
         };
+        Relationships: [];
       };
     };
+    Views: Record<string, never>;
     Functions: {
       get_weight_trend: {
         Args: { p_user_id: string; p_days?: number };

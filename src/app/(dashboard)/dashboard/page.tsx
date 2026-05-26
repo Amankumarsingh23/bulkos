@@ -11,7 +11,6 @@ import {
   ResponsiveContainer, ReferenceLine,
   PieChart, Pie, Cell, Label,
 } from "recharts";
-import type { TooltipProps } from "recharts";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { SkeletonCard } from "@/components/ui/Skeleton";
@@ -302,7 +301,7 @@ function WeekView({ weekDays, target }: { weekDays: WeekDay[]; target: number | 
 
 // ─── Weight trend chart ───────────────────────────────────────────────────────
 
-function WeightTooltip({ active, payload }: TooltipProps<number, string>) {
+function WeightTooltip({ active, payload }: { active?: boolean; payload?: ReadonlyArray<{ dataKey?: string | number; value?: number; name?: string; payload?: Record<string, string | number | null> }> }) {
   if (!active || !payload?.length) return null;
   const weight  = payload.find((p) => p.dataKey === "weight")?.value;
   const avg     = payload.find((p) => p.dataKey === "movingAvg")?.value;
@@ -356,7 +355,8 @@ function WeightTrendChart({
           width={36}
         />
         <RechartTooltip
-          content={<WeightTooltip />}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          content={(props: any) => <WeightTooltip {...props} />}
           cursor={{ stroke: "#E8DCC8", strokeWidth: 1 }}
         />
         {targetWeight && (
@@ -394,7 +394,7 @@ function WeightTrendChart({
 
 // ─── Macro donut ──────────────────────────────────────────────────────────────
 
-function MacroTooltip({ active, payload }: TooltipProps<number, string>) {
+function MacroTooltip({ active, payload }: { active?: boolean; payload?: ReadonlyArray<{ dataKey?: string | number; value?: number; name?: string; payload?: Record<string, string | number | null> }> }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-ivory border border-sand rounded-lg px-3 py-2 shadow-warm text-xs">
@@ -453,7 +453,8 @@ function MacroDonut({ slices, avgCalories }: {
                 }}
               />
             </Pie>
-            <RechartTooltip content={<MacroTooltip />} />
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            <RechartTooltip content={(props: any) => <MacroTooltip {...props} />} />
           </PieChart>
         </ResponsiveContainer>
       </div>

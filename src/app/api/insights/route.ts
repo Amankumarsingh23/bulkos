@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
+import { buildServerClient } from "@/lib/supabase";
 import { generateInsightReport, askAI } from "@/lib/groq";
 import type { Database } from "@/types/database";
 
@@ -37,7 +37,7 @@ function computeTargets(profile: {
 export async function POST(req: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = buildServerClient(cookieStore);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
