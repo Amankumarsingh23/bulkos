@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   createBrowserClient as _createBrowserClient,
   createServerClient as _createServerClient,
-} from "@supabase/auth-helpers-nextjs";
+} from "@supabase/ssr";
 import type { Database } from "@/types/database";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
