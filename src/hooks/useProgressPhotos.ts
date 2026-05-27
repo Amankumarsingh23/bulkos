@@ -61,10 +61,7 @@ export function useProgressPhotos() {
       .upload(path, file, { cacheControl: "3600", upsert: false });
 
     if (upErr) {
-      setError(upErr.message.includes("Bucket not found")
-        ? 'Storage bucket "progress-photos" not found. Create it in Supabase Dashboard → Storage → New bucket (name: progress-photos, public: ON).'
-        : upErr.message
-      );
+      setError(`Upload failed: ${upErr.message}`);
       setUploading(false);
       return false;
     }
