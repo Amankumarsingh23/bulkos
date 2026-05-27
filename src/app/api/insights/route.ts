@@ -10,15 +10,15 @@ function computeTargets(profile: {
   age: number | null;
   gender: string | null;
   activity_level: string | null;
+  target_weight_kg?: number | null;
+  target_date?: string | null;
 }): { targetCalories: number; targetProtein: number } {
   const weight = profile.weight_kg ?? 75;
-  const { height_cm, age, gender, activity_level } = profile;
+  const { height_cm, age, gender, activity_level, target_weight_kg, target_date } = profile;
   if (!height_cm || !age) return { targetCalories: 2500, targetProtein: 150 };
 
-  const bmr =
-    gender === "female"
-      ? 10 * weight + 6.25 * height_cm - 5 * age - 161
-      : 10 * weight + 6.25 * height_cm - 5 * age + 5;
+  const gOff = gender === "male" ? 5 : gender === "female" ? -161 : -78;
+  const bmr = 10 * weight + 6.25 * height_cm - 5 * age + gOff;
 
   const multipliers: Record<string, number> = {
     sedentary: 1.2,
@@ -28,8 +28,18 @@ function computeTargets(profile: {
     extra_active: 1.9,
   };
   const tdee = bmr * (multipliers[activity_level ?? "moderately_active"] ?? 1.55);
+
+  // Same formula as the client: surplus = (target - current) * 7700 / days
+  const days = target_date
+    ? Math.max(30, Math.ceil((new Date(target_date).getTime() - Date.now()) / 86_400_000))
+    : 180;
+  const surplus =
+    target_weight_kg != null
+      ? Math.round(((target_weight_kg - weight) * 7700) / days)
+      : 300;
+
   return {
-    targetCalories: Math.round(tdee + 300),
+    targetCalories: Math.round(tdee + surplus),
     targetProtein: Math.round(weight * 2.0),
   };
 }
