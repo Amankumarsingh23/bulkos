@@ -13,6 +13,7 @@ import {
   Camera,
   Dumbbell,
   FileText,
+  Share2,
   Settings,
   LogOut,
   X,
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { label: "AI Insights",     href: "/insights",         icon: Brain           },
   { label: "Goals",           href: "/goals",            icon: Target          },
   { label: "PDF Report",      href: "/report",           icon: FileText        },
+  { label: "Share Card",      href: "/share",            icon: Share2          },
   { label: "Settings",        href: "/settings",         icon: Settings        },
 ] as const;
 
