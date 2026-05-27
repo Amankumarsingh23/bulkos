@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Flame, Beef, Wheat, Droplets, Target,
   ArrowRight, TrendingUp, CalendarCheck, Zap, BookOpen, X,
+  AlertTriangle, Info,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip as RechartTooltip,
@@ -24,6 +25,10 @@ import {
   GRADE_COLOR, GRADE_BG,
   type WeekScore,
 } from "@/lib/weeklyScore";
+import {
+  computeNudges, isNudgeDismissed, dismissNudge,
+  type Nudge,
+} from "@/lib/nudges";
 import { cn } from "@/lib/utils";
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
@@ -641,6 +646,90 @@ function WeeklyScoreCard({ currentScore, history }: { currentScore: WeekScore; h
   );
 }
 
+// ─── Proactive Nudge Cards ────────────────────────────────────────────────────
+
+function NudgeCard({
+  nudge, onDismiss,
+}: {
+  nudge: Nudge;
+  onDismiss: () => void;
+}) {
+  const router = useRouter();
+  const isWarning = nudge.severity === "warning";
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -6, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}
+      transition={{ duration: 0.25 }}
+      className={cn(
+        "flex items-start justify-between gap-3 rounded-xl border px-4 py-3",
+        isWarning
+          ? "bg-terracotta/5 border-terracotta/20"
+          : "bg-gold/5 border-gold/25"
+      )}
+    >
+      <div className="flex items-start gap-2.5 min-w-0">
+        <div className={cn(
+          "h-4 w-4 flex-shrink-0 mt-0.5",
+          isWarning ? "text-terracotta" : "text-gold"
+        )}>
+          {isWarning
+            ? <AlertTriangle className="h-4 w-4" strokeWidth={2} />
+            : <Info className="h-4 w-4" strokeWidth={2} />
+          }
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-espresso leading-snug">
+            {nudge.headline}
+          </p>
+          <p className="text-xs text-warm-gray mt-1 leading-relaxed">
+            {nudge.body}
+          </p>
+          {nudge.actionLabel && nudge.actionHref && (
+            <button
+              onClick={() => router.push(nudge.actionHref!)}
+              className={cn(
+                "mt-2 text-xs font-semibold underline underline-offset-2 transition-colors",
+                isWarning ? "text-terracotta hover:text-terracotta/80" : "text-gold-dark hover:text-gold"
+              )}
+            >
+              {nudge.actionLabel} →
+            </button>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={onDismiss}
+        className="flex-shrink-0 p-1 rounded-md text-warm-gray hover:bg-sand/50 transition-colors mt-0.5"
+        aria-label="Dismiss"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </motion.div>
+  );
+}
+
+function NudgeCards({
+  nudges, onDismiss,
+}: {
+  nudges: Nudge[];
+  onDismiss: (type: Nudge["type"]) => void;
+}) {
+  if (nudges.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <AnimatePresence mode="popLayout">
+        {nudges.map((n) => (
+          <NudgeCard key={n.type} nudge={n} onDismiss={() => onDismiss(n.type)} />
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ─── Smart TDEE banner ────────────────────────────────────────────────────────
 
 function AdaptiveTDEEBanner({
@@ -706,6 +795,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const data = useDashboardData();
   const [tdeebannerDismissed, setTdeeBannerDismissed] = useState(false);
+  const [dismissedNudgeTypes, setDismissedNudgeTypes] = useState<Set<string>>(new Set());
 
   function dismissTDEEBanner() {
     setTdeeBannerDismissed(true);
@@ -737,6 +827,21 @@ export default function DashboardPage() {
     if (Math.abs(result.difference) < 150) return null;
     return result;
   })();
+
+  // Compute nudges (only after data loaded; filter out localStorage-dismissed ones)
+  const allNudges = data.loading
+    ? []
+    : computeNudges(data.allLogs, data.targets, data.currentWeight);
+  const visibleNudges = allNudges.filter(
+    (n) =>
+      !dismissedNudgeTypes.has(n.type) &&
+      !isNudgeDismissed(n.type, n.dismissTTLDays)
+  );
+
+  function handleDismissNudge(type: Nudge["type"]) {
+    dismissNudge(type);
+    setDismissedNudgeTypes((prev) => new Set([...prev, type]));
+  }
 
   if (data.loading) {
     return (
@@ -865,6 +970,9 @@ export default function DashboardPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* ── Proactive nudge cards ── */}
+      <NudgeCards nudges={visibleNudges} onDismiss={handleDismissNudge} />
 
       {/* ── Today at a Glance ── */}
       <motion.section {...fadeUp(0.05)}>
