@@ -63,29 +63,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    // Fetch logs for the period
+    // Fetch logs + weight_logs for the period
     const days = period === "week" ? 7 : 30;
     const since = new Date();
     since.setDate(since.getDate() - days);
     const sinceStr = since.toISOString().split("T")[0];
 
-    const { data: logs } = await supabase
-      .from("daily_logs")
-      .select("*")
-      .eq("user_id", user.id)
-      .gte("log_date", sinceStr)
-      .order("log_date", { ascending: true });
+    const [{ data: logs }, { data: weightLogs }, { data: latestWeightRow }] = await Promise.all([
+      supabase
+        .from("daily_logs")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("log_date", sinceStr)
+        .order("log_date", { ascending: true }),
+      supabase
+        .from("weight_logs")
+        .select("logged_at, weight_kg")
+        .eq("user_id", user.id)
+        .gte("logged_at", since.toISOString())
+        .order("logged_at", { ascending: true }),
+      // Latest weight ever (for target calc, not just within period)
+      supabase
+        .from("weight_logs")
+        .select("weight_kg")
+        .eq("user_id", user.id)
+        .order("logged_at", { ascending: false })
+        .limit(1),
+    ]);
 
-    // Get latest weight from logs for target computation
-    const latestWeight =
-      [...(logs ?? [])].reverse().find((l) => l.weight_kg !== null)?.weight_kg ?? null;
+    const latestWeight = latestWeightRow?.[0]?.weight_kg ?? null;
 
     const { targetCalories, targetProtein } = computeTargets({
       ...profile,
       weight_kg: latestWeight,
     });
 
-    const logsForAI = logs ?? [];
+    // Build daily-average weight map from weight_logs (IST date key)
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const weightByDate: Record<string, number[]> = {};
+    for (const w of weightLogs ?? []) {
+      const istDate = new Date(new Date(w.logged_at).getTime() + IST_OFFSET_MS)
+        .toISOString().slice(0, 10);
+      (weightByDate[istDate] ??= []).push(w.weight_kg);
+    }
+    const dailyAvgWeight: Record<string, number> = Object.fromEntries(
+      Object.entries(weightByDate).map(([d, vals]) => [
+        d,
+        Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10,
+      ])
+    );
+
+    // Inject daily-avg weight into daily_logs so AI sees real weight data
+    const logsForAI = (logs ?? []).map((l) => ({
+      ...l,
+      weight_kg: dailyAvgWeight[l.log_date] ?? null,
+    }));
 
     if (mode === "ask") {
       if (!question?.trim()) {

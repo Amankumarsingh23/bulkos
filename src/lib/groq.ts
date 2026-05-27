@@ -7,9 +7,11 @@ function getGroqClient() {
   return new Groq({ apiKey: process.env.GROQ_API_KEY });
 }
 
-const SYSTEM_PROMPT = `You are BulkOS AI — a nutrition and bulking coach analyzing a user's tracking data.
-You speak in a warm, encouraging but data-driven tone. You're like a smart friend
-who also happens to be a nutritionist.
+const SYSTEM_PROMPT = `You are BulkOS AI — a coach specializing in muscle gain and body recomposition.
+BulkOS is a bulking app. Most users are trying to GAIN weight and build muscle.
+ALWAYS read the "Goal:" field in the user profile and tailor advice accordingly.
+If the goal says BULKING, never suggest eating less — suggest eating more or maintaining the surplus.
+You speak in a warm, encouraging but data-driven tone.
 
 Analyze the provided data and give:
 1. **Summary**: 2-3 sentence overview of the period
@@ -24,9 +26,11 @@ Use actual numbers from their data. Be specific, not generic. If protein intake
 on weekends drops, say that. If they missed logging 3 days, mention it.
 Format with clean markdown.`;
 
-const ASK_SYSTEM_PROMPT = `You are BulkOS AI — a nutrition and bulking coach with access to a user's recent tracking data.
-You speak in a warm, encouraging but data-driven tone. Answer the user's specific question
-using their actual data. Be concise, specific, and actionable. Use markdown formatting.
+const ASK_SYSTEM_PROMPT = `You are BulkOS AI — a coach specializing in muscle gain and body recomposition.
+BulkOS is a bulking app. ALWAYS check the "Goal:" field in the user profile before giving advice.
+If the goal is BULKING, frame all calorie advice around hitting or exceeding the surplus target — never suggest eating less.
+Answer the user's specific question using their actual data.
+Be concise, specific, and actionable. Use markdown formatting.
 Keep responses focused — 150-300 words unless the question genuinely needs more.`;
 
 export interface InsightInput {
@@ -83,13 +87,26 @@ function buildDataSummary(input: InsightInput): string {
 
   const missedDays = (period === "week" ? 7 : 30) - logs.length;
 
+  const currentWeight = lastWeight ?? firstWeight ?? null;
+  const targetWeight = profile.target_weight_kg ?? null;
+  const goalDirection =
+    currentWeight !== null && targetWeight !== null
+      ? targetWeight > currentWeight
+        ? "BULKING (gaining weight)"
+        : targetWeight < currentWeight
+        ? "CUTTING (losing weight)"
+        : "MAINTAINING"
+      : "BULKING (gaining weight)"; // default assumption for BulkOS users
+
   return `
 **User Profile:**
 - Height: ${profile.height_cm ?? "?"}cm, Age: ${profile.age ?? "?"}
 - Gender: ${profile.gender ?? "?"}, Activity: ${profile.activity_level ?? "?"}
-- Target weight: ${profile.target_weight_kg ?? "not set"}kg
+- Current weight: ${currentWeight ?? "?"}kg
+- Target weight: ${targetWeight ?? "not set"}kg
+- Goal: ${goalDirection}
 - Target date: ${profile.target_date ?? "not set"}
-- Calculated TDEE + surplus target: ${targetCalories} kcal/day
+- Calorie target (TDEE + bulk surplus): ${targetCalories} kcal/day
 - Protein target: ${targetProtein}g/day
 
 **Period:** Last ${period === "week" ? "7" : "30"} days (${logs.length} days logged, ${missedDays} days missed)
