@@ -9,6 +9,7 @@ import { createBrowserClient } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
 import type { DailyLog, Profile } from "@/types/database";
 import type { MacroTargets } from "./useDailyLog";
+import { buildDailyWeightMap } from "@/lib/weightUtils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,16 +89,15 @@ function calcStreak(logs: DailyLog[]): number {
   return streak;
 }
 
-function buildWeightChart(logs: DailyLog[]): WeightChartPoint[] {
-  const today     = new Date();
-  const allW      = logs.filter((l) => l.weight_kg != null).map((l) => ({
-    date: l.log_date, weight: l.weight_kg!,
-  }));
+function buildWeightChart(
+  weightByDate: Record<string, number>
+): WeightChartPoint[] {
+  const today = new Date();
+  const allW  = Object.entries(weightByDate).map(([date, weight]) => ({ date, weight }));
 
   return Array.from({ length: 30 }, (_, i) => {
     const d       = addDays(subDays(today, 29), i);
     const dateStr = format(d, "yyyy-MM-dd");
-    const entry   = logs.find((l) => l.log_date === dateStr);
 
     // 7-day moving average up to this date
     const window7 = allW.filter(
@@ -109,9 +109,9 @@ function buildWeightChart(logs: DailyLog[]): WeightChartPoint[] {
         : null;
 
     return {
-      date: dateStr,
+      date:        dateStr,
       displayDate: format(d, "MMM d"),
-      weight:     entry?.weight_kg ?? null,
+      weight:      weightByDate[dateStr] ?? null,
       movingAvg,
     };
   });
@@ -140,25 +140,37 @@ export function useDashboardData(): DashboardData {
       const today  = format(new Date(), "yyyy-MM-dd");
       const since  = format(subDays(new Date(), 60), "yyyy-MM-dd");
 
-      const [{ data: profile }, { data: rawLogs }] = await Promise.all([
+      const [{ data: profile }, { data: rawLogs }, { data: rawWeightLogs }] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
         supabase
           .from("daily_logs").select("*")
           .eq("user_id", uid).gte("log_date", since)
           .order("log_date", { ascending: true }),
+        supabase
+          .from("weight_logs").select("id, logged_at, weight_kg, notes")
+          .eq("user_id", uid).gte("logged_at", new Date(Date.now() - 90 * 86400000).toISOString())
+          .order("logged_at", { ascending: true }),
       ]);
 
-      const logs       = rawLogs ?? [];
-      const todayLog   = logs.find((l) => l.log_date === today) ?? null;
+      const logs          = rawLogs ?? [];
+      const todayLog      = logs.find((l) => l.log_date === today) ?? null;
+      const weightByDate  = buildDailyWeightMap(rawWeightLogs ?? []);
 
-      const allWeights = logs.filter((l) => l.weight_kg != null).map((l) => l.weight_kg!);
-      const currentWeight  = allWeights.at(-1) ?? null;
-      const startingWeight = allWeights[0] ?? null;
+      // Inject daily avg weight into daily_logs so nudges/streak still work
+      const logsWithWeight: DailyLog[] = logs.map((l) => ({
+        ...l,
+        weight_kg: weightByDate[l.log_date] ?? null,
+      }));
+
+      // Weight stats derived from weight_logs (IST sorted ascending)
+      const sortedDates   = Object.keys(weightByDate).sort();
+      const currentWeight  = sortedDates.length ? weightByDate[sortedDates.at(-1)!] : null;
+      const startingWeight = sortedDates.length ? weightByDate[sortedDates[0]] : null;
       const weightChange   =
         currentWeight != null && startingWeight != null
           ? parseFloat((currentWeight - startingWeight).toFixed(1))
           : null;
-      const last7Weights   = allWeights.slice(-7);
+      const last7Weights = sortedDates.slice(-7).map((d) => weightByDate[d]);
 
       const targets = profile ? computeTargets(profile, currentWeight) : null;
       const streak  = calcStreak(logs);
@@ -184,7 +196,7 @@ export function useDashboardData(): DashboardData {
       });
 
       // ── Weight chart ─────────────────────────────────────────────────────
-      const weightChart = buildWeightChart(logs);
+      const weightChart = buildWeightChart(weightByDate);
 
       // ── Macro donut (this week's average) ────────────────────────────────
       const weekLogsWithMacros = logs.filter(
@@ -214,7 +226,7 @@ export function useDashboardData(): DashboardData {
         loading: false, profile, targets, todayLog,
         streak, weekDays, weightChart, macroSlices, weeklyAvgCalories,
         currentWeight, startingWeight, weightChange, last7Weights,
-        allLogs: logs,
+        allLogs: logsWithWeight,
       });
     }
 

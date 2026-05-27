@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
 import { differenceInDays, parseISO, format, startOfWeek } from "date-fns";
 import { computeWeekScore } from "@/lib/weeklyScore";
+import { buildDailyWeightMap, toISTDateStr } from "@/lib/weightUtils";
 import type { ShareCardData } from "@/lib/shareCard";
 import type { DailyLog } from "@/types/database";
 
@@ -38,17 +39,23 @@ export function useShareCardData(): ShareCardDataState {
       // Fetch data needed for the card
       const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
 
-      const [profileRes, logsRes, setsRes, photoRes, weekLogsRes] = await Promise.all([
+      const [profileRes, weightLogsRes, firstLogRes, setsRes, photoRes, weekLogsRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("target_weight_kg, height_cm, age, gender, activity_level, target_date")
           .eq("id", uid)
           .single(),
         supabase
-          .from("daily_logs")
-          .select("log_date, weight_kg")
+          .from("weight_logs")
+          .select("id, logged_at, weight_kg, notes")
           .eq("user_id", uid)
-          .order("log_date", { ascending: true }),
+          .order("logged_at", { ascending: true }),
+        supabase
+          .from("daily_logs")
+          .select("log_date")
+          .eq("user_id", uid)
+          .order("log_date", { ascending: true })
+          .limit(1),
         supabase
           .from("workout_sets")
           .select("exercise, weight_kg")
@@ -77,19 +84,20 @@ export function useShareCardData(): ShareCardDataState {
         target_date: string | null;
       } | null;
 
-      const logs = logsRes.data ?? [];
       const allSets = setsRes.data ?? [];
+      const allWeightLogs = weightLogsRes.data ?? [];
 
-      // Weeks on program
-      const firstLog = logs[0];
-      const weeksOnProgram = firstLog
-        ? Math.max(1, Math.floor(differenceInDays(new Date(), parseISO(firstLog.log_date)) / 7))
+      // Weeks on program — from first daily_log date
+      const firstLogDate = firstLogRes.data?.[0]?.log_date ?? null;
+      const weeksOnProgram = firstLogDate
+        ? Math.max(1, Math.floor(differenceInDays(new Date(), parseISO(firstLogDate)) / 7))
         : 1;
 
-      // Weight
-      const weightLogs = logs.filter((l) => l.weight_kg !== null);
-      const startWeight = weightLogs[0]?.weight_kg ?? null;
-      const currentWeight = weightLogs[weightLogs.length - 1]?.weight_kg ?? null;
+      // Weight — from weight_logs daily averages
+      const weightByDate = buildDailyWeightMap(allWeightLogs);
+      const sortedDates = Object.keys(weightByDate).sort();
+      const startWeight = sortedDates.length ? weightByDate[sortedDates[0]] : null;
+      const currentWeight = sortedDates.length ? weightByDate[sortedDates.at(-1)!] : null;
       const weightChange =
         startWeight !== null && currentWeight !== null
           ? Math.round((currentWeight - startWeight) * 10) / 10

@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { computeWeeklyHistory } from "@/lib/weeklyScore";
 import type { DailyLog, BodyMeasurement, Milestone } from "@/types/database";
+import { buildDailyWeightMap } from "@/lib/weightUtils";
 import type { WeekScore } from "@/lib/weeklyScore";
 
 export interface PR {
@@ -137,7 +138,7 @@ export function useReportData(periodDays: number) {
     const cutoffStr = cutoff.toISOString().slice(0, 10);
     const today = new Date().toISOString().slice(0, 10);
 
-    const [logsRes, measurementsRes, milestonesRes, sessionsRes] = await Promise.all([
+    const [logsRes, measurementsRes, milestonesRes, sessionsRes, weightLogsRes] = await Promise.all([
       supabase
         .from("daily_logs")
         .select("*")
@@ -159,11 +160,22 @@ export function useReportData(periodDays: number) {
         .select("*")
         .eq("user_id", profile.id)
         .gte("workout_date", cutoffStr),
+      supabase
+        .from("weight_logs")
+        .select("id, logged_at, weight_kg, notes")
+        .eq("user_id", profile.id)
+        .gte("logged_at", new Date(cutoff.getTime()).toISOString())
+        .order("logged_at", { ascending: true }),
     ]);
 
     if (logsRes.error) { setError(logsRes.error.message); setLoading(false); return; }
 
-    const logs: DailyLog[] = logsRes.data ?? [];
+    const weightByDate = buildDailyWeightMap(weightLogsRes.data ?? []);
+    const rawLogs: DailyLog[] = logsRes.data ?? [];
+    const logs: DailyLog[] = rawLogs.map((l) => ({
+      ...l,
+      weight_kg: weightByDate[l.log_date] ?? null,
+    }));
     const measurements: BodyMeasurement[] = measurementsRes.data ?? [];
     const milestones: Milestone[] = milestonesRes.data ?? [];
     const sessions = sessionsRes.data ?? [];
@@ -268,7 +280,7 @@ export function useReportData(periodDays: number) {
     const totalMilestones = milestones.length;
 
     // Weekly scores (last 8 weeks)
-    const allLogsForScoring: DailyLog[] = logsRes.data ?? [];
+    const allLogsForScoring: DailyLog[] = logs;
     const tdee = computeFormulaTDEE({
       weight_kg: currentWeight,
       height_cm: profile.height_cm,

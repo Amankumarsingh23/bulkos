@@ -5,8 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, ChevronRight, CalendarDays,
-  Flame, Beef, Wheat, Droplets, StickyNote, Check,
+  Flame, Beef, Wheat, Droplets, StickyNote, Check, Scale,
 } from "lucide-react";
+import Link from "next/link";
 import { format, addDays, parseISO, isToday, isFuture } from "date-fns";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -34,7 +35,7 @@ function DateSelector({ date, loggedDates, onChange }: DateSelectorProps) {
     }
   }
 
-  const isLogged  = loggedDates.has(date);
+  const isLogged     = loggedDates.has(date);
   const isCurrentDay = isToday(parsed);
 
   return (
@@ -67,7 +68,6 @@ function DateSelector({ date, loggedDates, onChange }: DateSelectorProps) {
         </div>
       </button>
 
-      {/* Hidden native date picker */}
       <input
         ref={dateRef}
         type="date"
@@ -99,84 +99,6 @@ function DateSelector({ date, loggedDates, onChange }: DateSelectorProps) {
   );
 }
 
-// ─── Weight section ───────────────────────────────────────────────────────────
-
-interface WeightSectionProps {
-  value: string;
-  onChange: (v: string) => void;
-  lastWeight: { value: number; daysAgo: number } | null;
-}
-
-function WeightSection({ value, onChange, lastWeight }: WeightSectionProps) {
-  const numValue = parseFloat(value);
-  const delta    = !isNaN(numValue) && lastWeight ? numValue - lastWeight.value : null;
-
-  return (
-    <Card animate={false}>
-      <CardContent className="pb-5">
-        <p className="text-[11px] font-semibold text-warm-gray uppercase tracking-widest mb-4">
-          Body Weight
-        </p>
-
-        <div className="flex items-end gap-3">
-          <input
-            type="number"
-            step="0.1"
-            min="30"
-            max="300"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={lastWeight ? String(lastWeight.value) : "0.0"}
-            className={cn(
-              "flex-1 bg-transparent font-display text-5xl font-bold text-espresso",
-              "placeholder:text-sand focus:text-gold outline-none transition-colors duration-150",
-              "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            )}
-            aria-label="Weight in kg"
-          />
-          <span className="text-xl text-warm-gray mb-2 flex-shrink-0">kg</span>
-        </div>
-
-        <AnimatePresence mode="wait">
-          {delta !== null ? (
-            <motion.p
-              key="delta"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className={cn(
-                "text-sm font-medium mt-2",
-                delta >= 0 ? "text-sage" : "text-terracotta"
-              )}
-            >
-              {delta > 0 ? "+" : ""}{delta.toFixed(1)} kg from last weigh-in
-            </motion.p>
-          ) : lastWeight ? (
-            <motion.p
-              key="lastknown"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-xs text-warm-gray mt-2"
-            >
-              Last recorded: {lastWeight.value} kg
-              {lastWeight.daysAgo > 0 ? ` · ${lastWeight.daysAgo}d ago` : " · yesterday"}
-            </motion.p>
-          ) : (
-            <motion.p
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-xs text-warm-gray mt-2"
-            >
-              No previous weight on record
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </CardContent>
-    </Card>
-  );
-}
-
 // ─── Macro card ───────────────────────────────────────────────────────────────
 
 interface MacroCardProps {
@@ -190,11 +112,11 @@ interface MacroCardProps {
 }
 
 function barColor(pct: number): string {
-  if (pct === 0)           return "bg-sand/60";
-  if (pct < 0.80)          return "bg-warm-gray/40";
-  if (pct < 0.95)          return "bg-gold";
-  if (pct <= 1.15)         return "bg-sage";
-  return                          "bg-terracotta";
+  if (pct === 0)   return "bg-sand/60";
+  if (pct < 0.80)  return "bg-warm-gray/40";
+  if (pct < 0.95)  return "bg-gold";
+  if (pct <= 1.15) return "bg-sage";
+  return                  "bg-terracotta";
 }
 
 function MacroCard({ label, unit, value, target, icon, iconColor, onChange }: MacroCardProps) {
@@ -250,7 +172,7 @@ function MacroCard({ label, unit, value, target, icon, iconColor, onChange }: Ma
 
 // ─── Success toast ────────────────────────────────────────────────────────────
 
-function Toast({ show }: { show: boolean }) {
+function SaveToast({ show }: { show: boolean }) {
   return (
     <AnimatePresence>
       {show && (
@@ -264,7 +186,7 @@ function Toast({ show }: { show: boolean }) {
           <span className="h-5 w-5 rounded-full bg-sage flex items-center justify-center flex-shrink-0">
             <Check className="h-3 w-3 text-white" strokeWidth={3} />
           </span>
-          Log saved successfully
+          Nutrition log saved
         </motion.div>
       )}
     </AnimatePresence>
@@ -284,19 +206,16 @@ function LogPageInner() {
   const [form, setForm] = useState<LogFormData>(EMPTY_FORM);
   const [showToast, setShowToast] = useState(false);
 
-  const { log, targets, lastWeight, loggedDates, loading, saving, saveError, save } =
-    useDailyLog(date);
+  const { log, targets, loggedDates, loading, saving, saveError, save } = useDailyLog(date);
 
-  // Sync form when log or date changes
   useEffect(() => {
     setForm({
-      weight_kg:  log?.weight_kg?.toString()  ?? "",
-      calories:   log?.calories?.toString()   ?? "",
-      protein_g:  log?.protein_g?.toString()  ?? "",
-      carbs_g:    log?.carbs_g?.toString()    ?? "",
-      fats_g:     log?.fats_g?.toString()     ?? "",
-      water_ml:   log?.water_ml?.toString()   ?? "",
-      notes:      log?.notes                  ?? "",
+      calories:  log?.calories?.toString()  ?? "",
+      protein_g: log?.protein_g?.toString() ?? "",
+      carbs_g:   log?.carbs_g?.toString()   ?? "",
+      fats_g:    log?.fats_g?.toString()    ?? "",
+      water_ml:  log?.water_ml?.toString()  ?? "",
+      notes:     log?.notes                 ?? "",
     });
   }, [log, date]);
 
@@ -355,19 +274,20 @@ function LogPageInner() {
         {/* Date selector */}
         <DateSelector date={date} loggedDates={loggedDates} onChange={setDate} />
 
-        {/* Weight */}
-        {loading ? (
-          <div className="bg-ivory border border-sand/60 rounded-xl p-6">
-            <Skeleton height={16} width="30%" className="mb-4" />
-            <Skeleton height={56} width="55%" />
+        {/* Weight tracker banner */}
+        <Link
+          href="/weight"
+          className="flex items-center gap-3 bg-espresso/5 border border-espresso/10 rounded-xl px-4 py-3 hover:bg-espresso/10 transition-colors group"
+        >
+          <span className="h-8 w-8 rounded-lg bg-gold/10 flex items-center justify-center flex-shrink-0">
+            <Scale className="h-4 w-4 text-gold" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-espresso">Log body weight</p>
+            <p className="text-xs text-warm-gray">Multiple readings per day · timestamps in IST</p>
           </div>
-        ) : (
-          <WeightSection
-            value={form.weight_kg}
-            onChange={set("weight_kg")}
-            lastWeight={lastWeight}
-          />
-        )}
+          <ChevronRight className="h-4 w-4 text-warm-gray group-hover:text-espresso transition-colors" />
+        </Link>
 
         {/* Nutrition grid */}
         <div>
@@ -431,12 +351,10 @@ function LogPageInner() {
           </CardContent>
         </Card>
 
-        {/* Error */}
         {saveError && (
           <p className="text-sm text-rose px-1">{saveError}</p>
         )}
 
-        {/* Desktop save button */}
         <Button
           variant="primary"
           size="lg"
@@ -444,11 +362,10 @@ function LogPageInner() {
           onClick={handleSave}
           className="hidden lg:flex w-full"
         >
-          Save Log
+          Save Nutrition Log
         </Button>
       </div>
 
-      {/* Mobile save button — fixed at bottom */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-cream/95 backdrop-blur-sm border-t border-sand/60 z-30">
         <Button
           variant="primary"
@@ -457,11 +374,11 @@ function LogPageInner() {
           onClick={handleSave}
           className="w-full"
         >
-          Save Log
+          Save Nutrition Log
         </Button>
       </div>
 
-      <Toast show={showToast} />
+      <SaveToast show={showToast} />
     </>
   );
 }

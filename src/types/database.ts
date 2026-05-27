@@ -274,6 +274,29 @@ export interface Database {
         };
         Relationships: [];
       };
+      weight_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          logged_at: string;
+          weight_kg: number;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          logged_at?: string;
+          weight_kg: number;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          weight_kg?: number;
+          notes?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -309,3 +332,4 @@ export type BodyMeasurement = Database["public"]["Tables"]["body_measurements"][
 export type ProgressPhoto = Database["public"]["Tables"]["progress_photos"]["Row"];
 export type WorkoutSession = Database["public"]["Tables"]["workout_sessions"]["Row"];
 export type WorkoutSet = Database["public"]["Tables"]["workout_sets"]["Row"];
+export type WeightLog = Database["public"]["Tables"]["weight_logs"]["Row"];

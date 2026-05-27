@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { differenceInDays, endOfMonth, format, parseISO, startOfMonth } from "date-fns";
+import { endOfMonth, format, parseISO, startOfMonth } from "date-fns";
 import { createBrowserClient } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
 import type { DailyLog, Profile } from "@/types/database";
@@ -16,7 +16,6 @@ export interface MacroTargets {
 }
 
 export interface LogFormData {
-  weight_kg: string;
   calories: string;
   protein_g: string;
   carbs_g: string;
@@ -26,7 +25,7 @@ export interface LogFormData {
 }
 
 export const EMPTY_FORM: LogFormData = {
-  weight_kg: "", calories: "", protein_g: "",
+  calories: "", protein_g: "",
   carbs_g: "", fats_g: "", water_ml: "", notes: "",
 };
 
@@ -66,7 +65,7 @@ export function useDailyLog(date: string) {
 
   const [log,         setLog]         = useState<DailyLog | null>(null);
   const [profile,     setProfile]     = useState<Profile | null>(null);
-  const [lastWeight,  setLastWeight]  = useState<{ value: number; daysAgo: number } | null>(null);
+  const [latestWeight, setLatestWeight] = useState<number | null>(null);
   const [loggedDates, setLoggedDates] = useState<Set<string>>(new Set());
   const [loading,     setLoading]     = useState(true);
   const [saving,      setSaving]      = useState(false);
@@ -79,7 +78,21 @@ export function useDailyLog(date: string) {
       .then(({ data }) => { if (data) setProfile(data); });
   }, [user, supabase]);
 
-  // Fetch log + context whenever date changes
+  // Fetch latest weight from weight_logs once for target calculation
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("weight_logs")
+      .select("weight_kg")
+      .eq("user_id", user.id)
+      .order("logged_at", { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        setLatestWeight(data?.[0]?.weight_kg ?? null);
+      });
+  }, [user, supabase]);
+
+  // Fetch log + logged dates whenever date changes
   useEffect(() => {
     if (!user) return;
     setLoading(true);
@@ -87,24 +100,10 @@ export function useDailyLog(date: string) {
     async function fetchAll() {
       const uid = user!.id;
 
-      // Log for this date
       const { data: logData } = await supabase
         .from("daily_logs").select("*")
         .eq("user_id", uid).eq("log_date", date).maybeSingle();
       setLog(logData);
-
-      // Most recent weight before this date
-      const { data: prevRows } = await supabase
-        .from("daily_logs").select("log_date, weight_kg")
-        .eq("user_id", uid).not("weight_kg", "is", null)
-        .lt("log_date", date).order("log_date", { ascending: false }).limit(1);
-
-      const prev = prevRows?.[0];
-      setLastWeight(
-        prev?.weight_kg
-          ? { value: prev.weight_kg, daysAgo: differenceInDays(parseISO(date), parseISO(prev.log_date)) }
-          : null
-      );
 
       // All logged dates in the visible month (for dot indicators)
       const monthStart = format(startOfMonth(parseISO(date)), "yyyy-MM-dd");
@@ -120,12 +119,11 @@ export function useDailyLog(date: string) {
     fetchAll();
   }, [user, date, supabase]);
 
-  // Targets — recalculated whenever profile or weight changes
+  // Targets — recalculated whenever profile or latest weight changes
   const targets = useMemo(() => {
     if (!profile) return null;
-    const w = log?.weight_kg ?? lastWeight?.value ?? null;
-    return computeTargets(profile, w);
-  }, [profile, log, lastWeight]);
+    return computeTargets(profile, latestWeight);
+  }, [profile, latestWeight]);
 
   const save = useCallback(async (formData: LogFormData): Promise<boolean> => {
     if (!user) return false;
@@ -137,7 +135,6 @@ export function useDailyLog(date: string) {
       .upsert({
         user_id:   user.id,
         log_date:  date,
-        weight_kg: formData.weight_kg  ? parseFloat(formData.weight_kg)  : null,
         calories:  formData.calories   ? parseInt(formData.calories)      : null,
         protein_g: formData.protein_g  ? parseFloat(formData.protein_g)  : null,
         carbs_g:   formData.carbs_g    ? parseFloat(formData.carbs_g)    : null,
@@ -159,5 +156,5 @@ export function useDailyLog(date: string) {
     return true;
   }, [user, date, supabase]);
 
-  return { log, profile, targets, lastWeight, loggedDates, loading, saving, saveError, save };
+  return { log, profile, targets, loggedDates, loading, saving, saveError, save };
 }

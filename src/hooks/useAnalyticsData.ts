@@ -23,6 +23,7 @@ import {
   type ConsistencyCell,
 } from "@/lib/analytics";
 import type { DailyLog } from "@/types/database";
+import { buildDailyWeightMap } from "@/lib/weightUtils";
 
 function computeTargetCalories(profile: {
   height_cm: number | null;
@@ -93,12 +94,24 @@ export function useAnalyticsData(range: TimeRange): AnalyticsData {
     if (!profile?.id) return;
     setLoading(true);
     const supabase = createBrowserClient();
-    const { data } = await supabase
-      .from("daily_logs")
-      .select("*")
-      .eq("user_id", profile.id)
-      .order("log_date", { ascending: true });
-    setAllLogs(data ?? []);
+    const [{ data: rawLogs }, { data: rawWeightLogs }] = await Promise.all([
+      supabase
+        .from("daily_logs")
+        .select("*")
+        .eq("user_id", profile.id)
+        .order("log_date", { ascending: true }),
+      supabase
+        .from("weight_logs")
+        .select("id, logged_at, weight_kg, notes")
+        .eq("user_id", profile.id)
+        .order("logged_at", { ascending: true }),
+    ]);
+    const weightByDate = buildDailyWeightMap(rawWeightLogs ?? []);
+    const logsWithWeight: DailyLog[] = (rawLogs ?? []).map((l) => ({
+      ...l,
+      weight_kg: weightByDate[l.log_date] ?? null,
+    }));
+    setAllLogs(logsWithWeight);
     setLoading(false);
   }, [profile?.id]);
 

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Flame, Beef, Wheat, Droplets, Check, X } from "lucide-react";
+import { Flame, Beef, Wheat, Droplets, Check, X, Scale } from "lucide-react";
 import { format } from "date-fns";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useDailyLog, type LogFormData, EMPTY_FORM } from "@/hooks/useDailyLog";
@@ -74,16 +75,14 @@ function MiniMacro({ icon, iconColor, label, unit, value, target, onChange }: Mi
 
 export function QuickLogModal({ open, onClose }: QuickLogModalProps) {
   const today = format(new Date(), "yyyy-MM-dd");
-  const { log, targets, lastWeight, saving, saveError, save } = useDailyLog(today);
+  const { log, targets, saving, saveError, save } = useDailyLog(today);
 
   const [form,      setForm]      = useState<LogFormData>(EMPTY_FORM);
   const [showToast, setShowToast] = useState(false);
 
-  // Sync form with fetched log
   useEffect(() => {
     if (!open) return;
     setForm({
-      weight_kg: log?.weight_kg?.toString() ?? "",
       calories:  log?.calories?.toString()  ?? "",
       protein_g: log?.protein_g?.toString() ?? "",
       carbs_g:   log?.carbs_g?.toString()   ?? "",
@@ -93,7 +92,6 @@ export function QuickLogModal({ open, onClose }: QuickLogModalProps) {
     });
   }, [log, open]);
 
-  // Keyboard close
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     if (open) document.addEventListener("keydown", handler);
@@ -115,16 +113,10 @@ export function QuickLogModal({ open, onClose }: QuickLogModalProps) {
     }
   }
 
-  const weightDelta =
-    form.weight_kg && lastWeight
-      ? parseFloat(form.weight_kg) - lastWeight.value
-      : null;
-
   return (
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          {/* Backdrop */}
           <motion.div
             key="backdrop"
             initial={{ opacity: 0 }}
@@ -135,7 +127,6 @@ export function QuickLogModal({ open, onClose }: QuickLogModalProps) {
             onClick={onClose}
           />
 
-          {/* Sheet */}
           <motion.div
             key="sheet"
             initial={{ y: "100%", opacity: 0 }}
@@ -148,12 +139,10 @@ export function QuickLogModal({ open, onClose }: QuickLogModalProps) {
               "sm:max-w-md"
             )}
           >
-            {/* Drag handle — mobile */}
             <div className="sm:hidden flex justify-center pt-3 pb-1">
               <div className="h-1 w-10 rounded-full bg-sand" />
             </div>
 
-            {/* Header */}
             <div className="flex items-center justify-between px-5 pt-4 sm:pt-5 pb-4 border-b border-sand/50">
               <div>
                 <h2 className="font-display text-lg text-espresso">Quick Log</h2>
@@ -170,38 +159,17 @@ export function QuickLogModal({ open, onClose }: QuickLogModalProps) {
             </div>
 
             <div className="px-5 py-5 space-y-5">
-              {/* Weight */}
-              <div>
-                <p className="text-[11px] font-semibold text-warm-gray uppercase tracking-widest mb-2">
-                  Body Weight
-                </p>
-                <div className="flex items-end gap-2">
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="30"
-                    max="300"
-                    value={form.weight_kg}
-                    onChange={(e) => set("weight_kg")(e.target.value)}
-                    placeholder={lastWeight ? String(lastWeight.value) : "0.0"}
-                    className={cn(
-                      "flex-1 bg-cream border border-sand rounded-lg px-3 py-2.5",
-                      "font-display text-2xl font-semibold text-espresso placeholder:text-sand",
-                      "focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-colors",
-                      "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    )}
-                  />
-                  <span className="text-base text-warm-gray mb-2.5">kg</span>
-                </div>
-                {weightDelta !== null && (
-                  <p className={cn("text-xs mt-1.5 font-medium",
-                    weightDelta >= 0 ? "text-sage" : "text-terracotta")}>
-                    {weightDelta > 0 ? "+" : ""}{weightDelta.toFixed(1)} kg
-                  </p>
-                )}
-              </div>
+              {/* Weight tracker shortcut */}
+              <Link
+                href="/weight"
+                onClick={onClose}
+                className="flex items-center gap-3 bg-espresso/5 border border-espresso/10 rounded-xl px-3 py-2.5 hover:bg-espresso/10 transition-colors"
+              >
+                <Scale className="h-4 w-4 text-gold flex-shrink-0" />
+                <span className="text-sm text-espresso font-medium">Log body weight →</span>
+              </Link>
 
-              {/* Macros — 2x2 */}
+              {/* Macros */}
               <div>
                 <p className="text-[11px] font-semibold text-warm-gray uppercase tracking-widest mb-3">
                   Nutrition
@@ -234,7 +202,6 @@ export function QuickLogModal({ open, onClose }: QuickLogModalProps) {
                 </div>
               </div>
 
-              {/* Notes */}
               <Input
                 label="Notes (optional)"
                 value={form.notes}
@@ -246,7 +213,6 @@ export function QuickLogModal({ open, onClose }: QuickLogModalProps) {
                 <p className="text-sm text-rose">{saveError}</p>
               )}
 
-              {/* Save */}
               <Button
                 variant="primary"
                 size="lg"
