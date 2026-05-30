@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
 import {
   ResponsiveContainer, ComposedChart, Line, Area,
@@ -16,10 +16,11 @@ import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/hooks/useAuth";
 import { createBrowserClient } from "@/lib/supabase";
 import {
-  buildWeightPoints, linearProjection, estimateCompletionDate,
-  calculateRequiredSurplus, calculateWeeklyStats, buildProjectionChartData,
+  buildWeightPointsFromMap, linearProjection, estimateCompletionDate,
+  calculateRequiredSurplus, calculateWeeklyStatsFromMap, buildProjectionChartData,
 } from "@/lib/projections";
-import type { DailyLog, Milestone } from "@/types/database";
+import { buildDailyWeightMap } from "@/lib/weightUtils";
+import type { Milestone } from "@/types/database";
 
 // ─── TDEE helper (mirrors useDashboardData) ──────────────────────────────────
 const ACT: Record<string, number> = {
@@ -393,21 +394,33 @@ function ChartLegend() {
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function GoalsPage() {
   const { profile, user } = useAuth();
-  const [logs, setLogs]             = useState<DailyLog[]>([]);
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [showModal, setShowModal]   = useState(false);
+  const [weightByDate, setWeightByDate] = useState<Record<string, number>>({});
+  const [logCount, setLogCount]         = useState(0);
+  const [milestones, setMilestones]     = useState<Milestone[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [showModal, setShowModal]       = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
     const sb = createBrowserClient();
-    const [{ data: logsData }, { data: msData }] = await Promise.all([
-      sb.from("daily_logs").select("*").eq("user_id", user.id).order("log_date", { ascending: true }),
-      sb.from("milestones").select("*").eq("user_id", user.id).order("target_weight_kg", { ascending: true }),
+    const [{ data: weightLogs }, { data: msData }, { data: logDates }] = await Promise.all([
+      sb.from("weight_logs")
+        .select("id, logged_at, weight_kg, notes")
+        .eq("user_id", user.id)
+        .order("logged_at", { ascending: true }),
+      sb.from("milestones")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("target_weight_kg", { ascending: true }),
+      // Just need log count for consistency %
+      sb.from("daily_logs")
+        .select("log_date")
+        .eq("user_id", user.id),
     ]);
-    setLogs(logsData ?? []);
+    setWeightByDate(buildDailyWeightMap(weightLogs ?? []));
     setMilestones(msData ?? []);
+    setLogCount((logDates ?? []).length);
     setLoading(false);
   }, [user?.id]);
 
@@ -424,7 +437,7 @@ export default function GoalsPage() {
   }
 
   // ── Derived data ────────────────────────────────────────────────────────────
-  const weightPoints  = buildWeightPoints(logs);
+  const weightPoints  = buildWeightPointsFromMap(weightByDate);
   const proj          = linearProjection(weightPoints);
   const currentWeight = weightPoints.at(-1)?.weight ?? null;
   const startWeight   = weightPoints[0]?.weight ?? null;
@@ -434,15 +447,21 @@ export default function GoalsPage() {
   const targetDate    = profile?.target_date ?? null;
 
   const pct = startWeight !== null && targetWeight !== null && currentWeight !== null && targetWeight !== startWeight
-    ? Math.round(((currentWeight - startWeight) / (targetWeight - startWeight)) * 100)
+    ? Math.min(100, Math.max(0, Math.round(((currentWeight - startWeight) / (targetWeight - startWeight)) * 100)))
     : 0;
 
-  const dailyRate     = proj?.slope ?? 0;
-  const weeklyRate    = Math.round(dailyRate * 7 * 100) / 100;
-  const estimatedEnd  = targetWeight && currentWeight ? estimateCompletionDate(currentWeight, targetWeight, Math.max(0, dailyRate)) : null;
+  const dailyRate    = proj?.slope ?? 0;
+  const weeklyRate   = Math.round(dailyRate * 7 * 100) / 100;
+  const estimatedEnd = targetWeight && currentWeight
+    ? estimateCompletionDate(currentWeight, targetWeight, Math.max(0, dailyRate))
+    : null;
 
   const daysSinceStart = startDate ? differenceInDays(new Date(), parseISO(startDate)) : 0;
-  const daysToTarget   = targetDate ? differenceInDays(parseISO(targetDate), new Date()) : estimatedEnd ? differenceInDays(estimatedEnd, new Date()) : null;
+  const daysToTarget   = targetDate
+    ? differenceInDays(parseISO(targetDate), new Date())
+    : estimatedEnd
+    ? differenceInDays(estimatedEnd, new Date())
+    : null;
 
   const tdee = profile && currentWeight
     ? tdeeFromProfile({ ...profile, weight_kg: currentWeight })
@@ -451,9 +470,9 @@ export default function GoalsPage() {
     ? calculateRequiredSurplus(currentWeight, targetWeight, daysToTarget, tdee)
     : null;
 
-  const weeklyStats   = calculateWeeklyStats(logs);
-  const consistency   = logs.length > 0 && daysSinceStart > 0
-    ? Math.round((logs.length / Math.max(daysSinceStart, logs.length)) * 100)
+  const weeklyStats  = calculateWeeklyStatsFromMap(weightByDate);
+  const consistency  = logCount > 0 && daysSinceStart > 0
+    ? Math.round((logCount / Math.max(daysSinceStart, logCount)) * 100)
     : 0;
 
   const chartData = targetWeight && startWeight !== null

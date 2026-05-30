@@ -50,6 +50,20 @@ export function buildWeightPoints(logs: DailyLog[]): WeightPoint[] {
   }));
 }
 
+/** Build WeightPoint[] directly from { "yyyy-MM-dd": avgKg } map (from weight_logs). */
+export function buildWeightPointsFromMap(
+  weightByDate: Record<string, number>
+): WeightPoint[] {
+  const sorted = Object.entries(weightByDate).sort(([a], [b]) => a.localeCompare(b));
+  if (!sorted.length) return [];
+  const origin = parseISO(sorted[0][0]);
+  return sorted.map(([date, weight]) => ({
+    date,
+    weight,
+    dayIndex: differenceInDays(parseISO(date), origin),
+  }));
+}
+
 export function linearProjection(points: WeightPoint[]): LinearProjectionResult | null {
   const n = points.length;
   if (n < 2) return null;
@@ -105,7 +119,6 @@ export function calculateWeeklyStats(logs: DailyLog[]): WeeklyStats {
 
   if (withWeight.length < 2) return { avgWeeklyGain: null, bestWeekGain: null, worstWeekGain: null };
 
-  // Group into 7-day windows
   const gains: number[] = [];
   for (let i = 7; i < withWeight.length; i++) {
     const prev = withWeight.find(
@@ -118,7 +131,6 @@ export function calculateWeeklyStats(logs: DailyLog[]): WeeklyStats {
   }
 
   if (!gains.length) {
-    // fallback: total gain / total weeks
     const totalGain  = withWeight.at(-1)!.weight_kg! - withWeight[0].weight_kg!;
     const totalWeeks = differenceInDays(
       parseISO(withWeight.at(-1)!.log_date),
@@ -132,6 +144,45 @@ export function calculateWeeklyStats(logs: DailyLog[]): WeeklyStats {
   }
 
   const avg  = gains.reduce((a, b) => a + b, 0) / gains.length;
+  return {
+    avgWeeklyGain : Math.round(avg * 100) / 100,
+    bestWeekGain  : Math.round(Math.max(...gains) * 100) / 100,
+    worstWeekGain : Math.round(Math.min(...gains) * 100) / 100,
+  };
+}
+
+/** Same as calculateWeeklyStats but works from the daily-average weight map. */
+export function calculateWeeklyStatsFromMap(
+  weightByDate: Record<string, number>
+): WeeklyStats {
+  const sorted = Object.entries(weightByDate)
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  if (sorted.length < 2) return { avgWeeklyGain: null, bestWeekGain: null, worstWeekGain: null };
+
+  // Find ~7-day pairs
+  const gains: number[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length; j++) {
+      const dayDiff = differenceInDays(parseISO(sorted[j][0]), parseISO(sorted[i][0]));
+      if (dayDiff >= 5 && dayDiff <= 9) {
+        gains.push(sorted[j][1] - sorted[i][1]);
+        break;
+      }
+    }
+  }
+
+  if (!gains.length) {
+    const totalGain  = sorted.at(-1)![1] - sorted[0][1];
+    const totalWeeks = differenceInDays(parseISO(sorted.at(-1)![0]), parseISO(sorted[0][0])) / 7;
+    return {
+      avgWeeklyGain: totalWeeks > 0 ? Math.round((totalGain / totalWeeks) * 100) / 100 : null,
+      bestWeekGain: null,
+      worstWeekGain: null,
+    };
+  }
+
+  const avg = gains.reduce((a, b) => a + b, 0) / gains.length;
   return {
     avgWeeklyGain : Math.round(avg * 100) / 100,
     bestWeekGain  : Math.round(Math.max(...gains) * 100) / 100,
