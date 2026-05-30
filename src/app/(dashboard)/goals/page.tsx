@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
 import {
-  ResponsiveContainer, ComposedChart, Line, Area,
+  ResponsiveContainer, ComposedChart, Line,
   XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine,
 } from "recharts";
 import {
@@ -113,18 +113,29 @@ function GoalProgressBar({
 }
 
 // ─── Projection chart ─────────────────────────────────────────────────────────
-function ProjectionChart({ data }: { data: ReturnType<typeof buildProjectionChartData> }) {
+function ProjectionChart({
+  data,
+  startWeight,
+  targetWeight,
+}: {
+  data: ReturnType<typeof buildProjectionChartData>;
+  startWeight: number | null;
+  targetWeight: number | null;
+}) {
   if (!data.length) return (
     <div className="h-64 flex items-center justify-center text-sm text-warm-gray">No data yet</div>
   );
 
-  // Thin out x-axis ticks
   const tickEvery = Math.max(1, Math.floor(data.length / 8));
   const ticks = data.filter((_, i) => i % tickEvery === 0).map((d) => d.date);
 
-  const allVals = data.flatMap((d) => [d.actual, d.projected, d.plan].filter((v): v is number => v !== null));
-  const yMin = allVals.length ? Math.floor(Math.min(...allVals) - 1) : 60;
-  const yMax = allVals.length ? Math.ceil(Math.max(...allVals) + 2) : 90;
+  // Tight Y range: start just below the lowest logged weight, end just above target
+  const actualVals = data.map((d) => d.actual).filter((v): v is number => v !== null);
+  const dataMin = actualVals.length ? Math.min(...actualVals) : (startWeight ?? 60);
+  const dataMax = targetWeight ?? (startWeight ? startWeight + 10 : 80);
+  const padding = Math.max((dataMax - dataMin) * 0.08, 0.5);
+  const yMin = Math.floor(dataMin - padding);
+  const yMax = Math.ceil(dataMax + padding);
 
   function TooltipContent({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
@@ -133,7 +144,7 @@ function ProjectionChart({ data }: { data: ReturnType<typeof buildProjectionChar
       <div className="bg-ivory border border-sand rounded-xl px-3 py-2 shadow-warm text-xs">
         <p className="text-warm-gray mb-1">{d?.label ?? label}</p>
         {d?.actual    != null && <p className="text-gold font-medium">Actual: {d.actual} kg</p>}
-        {d?.projected != null && <p className="text-gold/70">Projected: {d.projected} kg</p>}
+        {d?.projected != null && <p className="text-gold/60">Projected: {d.projected} kg</p>}
         {d?.plan      != null && <p className="text-warm-gray">Plan: {d.plan} kg</p>}
       </div>
     );
@@ -141,21 +152,12 @@ function ProjectionChart({ data }: { data: ReturnType<typeof buildProjectionChar
 
   return (
     <ResponsiveContainer width="100%" height={280}>
-      <ComposedChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-        <defs>
-          <linearGradient id="confGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#C9A96E" stopOpacity={0.15} />
-            <stop offset="100%" stopColor="#C9A96E" stopOpacity={0.03} />
-          </linearGradient>
-        </defs>
+      <ComposedChart data={data} margin={{ top: 16, right: 12, left: -16, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#E8DDD0" strokeOpacity={0.5} />
         <XAxis
           dataKey="date"
           ticks={ticks}
-          tickFormatter={(v) => {
-            const d = data.find((x) => x.date === v);
-            return d?.label ?? v;
-          }}
+          tickFormatter={(v) => data.find((x) => x.date === v)?.label ?? v}
           tick={{ fontSize: 10, fill: "#9B8E87" }}
           tickLine={false}
           axisLine={false}
@@ -166,30 +168,43 @@ function ProjectionChart({ data }: { data: ReturnType<typeof buildProjectionChar
           tickLine={false}
           axisLine={false}
           tickFormatter={(v) => `${v}`}
+          width={36}
         />
         <Tooltip content={<TooltipContent />} />
 
-        {/* Confidence band (stacked area trick) */}
-        <Area type="monotone" dataKey="projBase"  stroke="none" fill="transparent" stackId="conf" dot={false} legendType="none" connectNulls />
-        <Area type="monotone" dataKey="projBand"  stroke="none" fill="url(#confGrad)" fillOpacity={1} stackId="conf" dot={false} legendType="none" connectNulls />
-
         {/* Plan line */}
-        <Line type="monotone" dataKey="plan"      stroke="#9B8E87" strokeWidth={1.5} strokeDasharray="5 4" dot={false} legendType="none" connectNulls name="Plan" />
+        <Line
+          type="monotone" dataKey="plan"
+          stroke="#C4B49A" strokeWidth={1.5} strokeDasharray="5 4"
+          dot={false} connectNulls name="Plan"
+        />
 
         {/* Projected line */}
-        <Line type="monotone" dataKey="projected" stroke="#C9A96E" strokeWidth={2} strokeDasharray="6 3" dot={false} connectNulls name="Projected" />
-
-        {/* Actual line */}
         <Line
-          type="monotone"
-          dataKey="actual"
-          stroke="#C9A96E"
-          strokeWidth={2.5}
-          dot={{ r: 2.5, fill: "#C9A96E", strokeWidth: 0 }}
-          activeDot={{ r: 5 }}
-          connectNulls
-          name="Actual"
+          type="monotone" dataKey="projected"
+          stroke="#C9A96E" strokeWidth={2} strokeDasharray="6 3"
+          dot={false} connectNulls name="Projected"
         />
+
+        {/* Actual line — solid, slightly thicker, dots on each reading */}
+        <Line
+          type="monotone" dataKey="actual"
+          stroke="#A07B45" strokeWidth={2.5}
+          dot={{ r: 3, fill: "#A07B45", strokeWidth: 0 }}
+          activeDot={{ r: 5, fill: "#C9A96E" }}
+          connectNulls name="Actual"
+        />
+
+        {/* Target reference line */}
+        {targetWeight && (
+          <ReferenceLine
+            y={targetWeight}
+            stroke="#C9A96E"
+            strokeDasharray="4 3"
+            strokeOpacity={0.5}
+            label={{ value: `${targetWeight} kg target`, position: "right", fontSize: 9, fill: "#9B8E87" }}
+          />
+        )}
 
         {/* Today line */}
         <ReferenceLine
@@ -374,18 +389,18 @@ function StatCard({ icon, label, value, sub, accent = false }: {
 // ─── Legend ───────────────────────────────────────────────────────────────────
 function ChartLegend() {
   return (
-    <div className="flex flex-wrap gap-4 text-xs text-warm-gray mt-1">
+    <div className="flex flex-wrap gap-4 text-xs text-warm-gray mt-2">
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-0.5 w-5 bg-gold rounded" /> Actual
+        <span className="inline-block h-[3px] w-5 bg-gold-dark rounded" /> Actual
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-0.5 w-5 bg-gold/60 rounded border-t border-dashed border-gold" /> Projected
+        <span className="inline-block h-[2px] w-5 bg-gold/70 rounded" style={{ borderTop: "2px dashed #C9A96E", background: "none" }} /> Projected
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-0.5 w-5 bg-warm-gray/60 rounded border-t border-dashed border-warm-gray" /> Original plan
+        <span className="inline-block h-[2px] w-5" style={{ borderTop: "2px dashed #C4B49A" }} /> Original plan
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-4 rounded bg-gold/15" /> Confidence band
+        <span className="inline-block h-[2px] w-5" style={{ borderTop: "2px dashed #C9A96E", opacity: 0.5 }} /> Target
       </span>
     </div>
   );
@@ -628,7 +643,7 @@ export default function GoalsPage() {
               </div>
             )}
           </div>
-          <ProjectionChart data={chartData} />
+          <ProjectionChart data={chartData} startWeight={startWeight} targetWeight={targetWeight} />
           <ChartLegend />
         </motion.div>
 
